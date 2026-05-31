@@ -2,8 +2,13 @@ import {
   calculateStockFromTransactions,
   validateStockAvailability,
 } from "@/domain/inventory/inventory.engine";
-import type { InventoryTransaction, StockSummary } from "@/domain/types";
+import type {
+  InventoryTransaction,
+  Product,
+  StockSummary,
+} from "@/domain/types";
 import { AppError } from "@/lib/errors";
+import type { PaginatedResult } from "@/lib/pagination";
 import { eventBus } from "@/lib/events/event-bus";
 import { inventoryRepository } from "@/repositories/inventory.repository";
 import { productRepository } from "@/repositories/product.repository";
@@ -18,16 +23,19 @@ export const inventoryService = {
     return calculateStockFromTransactions(transactions);
   },
 
-  async getSummary(businessId: string): Promise<StockSummary[]> {
+  async getSummary(
+    businessId: string,
+    options?: { page?: number; pageSize?: number }
+  ): Promise<StockSummary[] | PaginatedResult<StockSummary>> {
     await businessService.getById(businessId);
-    const [products, stockRows] = await Promise.all([
-      productRepository.findByBusiness(businessId),
-      inventoryRepository.aggregateStockByBusiness(businessId),
-    ]);
+    const stockRows = await inventoryRepository.aggregateStockByBusiness(
+      businessId
+    );
     const stockMap = new Map(
       stockRows.map((r) => [r.productId, r.stock])
     );
-    return products.map((p) => {
+
+    const toSummary = (p: Product): StockSummary => {
       const stock = stockMap.get(p._id) ?? 0;
       return {
         productId: p._id,
@@ -38,7 +46,21 @@ export const inventoryService = {
         trackExpiry: p.trackExpiry,
         isLowStock: stock <= p.minStock,
       };
-    });
+    };
+
+    if (options?.page != null && options?.pageSize != null) {
+      const result = await productRepository.findByBusinessPaginated(
+        businessId,
+        { activeOnly: true, page: options.page, pageSize: options.pageSize }
+      );
+      return {
+        items: result.items.map((p) => toSummary(p)),
+        meta: result.meta,
+      };
+    }
+
+    const products = await productRepository.findByBusiness(businessId);
+    return products.map((p) => toSummary(p));
   },
 
   async addAdjustment(input: {

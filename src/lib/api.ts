@@ -27,3 +27,5 @@ export function parseQueryBusinessId(
 ): string | null {
   return searchParams.get("businessId");
 }
+
+export { parsePaginationParams } from "@/lib/pagination";

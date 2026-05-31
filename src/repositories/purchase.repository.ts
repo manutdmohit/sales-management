@@ -1,18 +1,37 @@
 import type { Purchase } from "@/domain/types";
 import { mapId } from "@/lib/map-document";
+import {
+  buildPaginatedResult,
+  type PaginatedResult,
+} from "@/lib/pagination";
 import { normalizeMongoWeekKey } from "@/lib/report-ranges";
 import { PurchaseModel } from "@/models/purchase.model";
 
 export const purchaseRepository = {
-  async findByBusiness(
-    businessId: string,
-    limit = 50
-  ): Promise<Purchase[]> {
+  async findByBusiness(businessId: string): Promise<Purchase[]> {
     const docs = await PurchaseModel.find({ businessId })
       .sort({ createdAt: -1 })
-      .limit(limit)
       .lean();
     return docs.map((doc) => mapId(doc) as Purchase);
+  },
+
+  async findByBusinessPaginated(
+    businessId: string,
+    page: number,
+    pageSize: number
+  ): Promise<PaginatedResult<Purchase>> {
+    const filter = { businessId };
+    const skip = (page - 1) * pageSize;
+    const [docs, total] = await Promise.all([
+      PurchaseModel.find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(pageSize)
+        .lean(),
+      PurchaseModel.countDocuments(filter),
+    ]);
+    const items = docs.map((doc) => mapId(doc) as Purchase);
+    return buildPaginatedResult(items, total, page, pageSize);
   },
 
   async create(data: Omit<Purchase, "_id">): Promise<Purchase> {

@@ -1,5 +1,9 @@
 import type { BusinessType, Product } from "@/domain/types";
 import { mapId, toObjectId } from "@/lib/map-document";
+import {
+  buildPaginatedResult,
+  type PaginatedResult,
+} from "@/lib/pagination";
 import { ProductModel } from "@/models/product.model";
 
 function toProduct(doc: Record<string, unknown>): Product {
@@ -10,21 +14,59 @@ function toProduct(doc: Record<string, unknown>): Product {
   };
 }
 
+function buildProductFilter(
+  businessId: string,
+  options?: { search?: string; activeOnly?: boolean }
+): Record<string, unknown> {
+  const filter: Record<string, unknown> = { businessId };
+  if (options?.activeOnly !== false) filter.isActive = true;
+  if (options?.search) {
+    filter.$or = [
+      { name: { $regex: options.search, $options: "i" } },
+      { sku: { $regex: options.search, $options: "i" } },
+    ];
+  }
+  return filter;
+}
+
 export const productRepository = {
   async findByBusiness(
     businessId: string,
     options?: { search?: string; activeOnly?: boolean }
   ): Promise<Product[]> {
-    const filter: Record<string, unknown> = { businessId };
-    if (options?.activeOnly !== false) filter.isActive = true;
-    if (options?.search) {
-      filter.$or = [
-        { name: { $regex: options.search, $options: "i" } },
-        { sku: { $regex: options.search, $options: "i" } },
-      ];
-    }
+    const filter = buildProductFilter(businessId, options);
     const docs = await ProductModel.find(filter).sort({ name: 1 }).lean();
     return docs.map((doc) => toProduct(doc as Record<string, unknown>));
+  },
+
+  async findByBusinessPaginated(
+    businessId: string,
+    options: {
+      search?: string;
+      activeOnly?: boolean;
+      page: number;
+      pageSize: number;
+    }
+  ): Promise<PaginatedResult<Product>> {
+    const filter = buildProductFilter(businessId, options);
+    const skip = (options.page - 1) * options.pageSize;
+    const [docs, total] = await Promise.all([
+      ProductModel.find(filter)
+        .sort({ name: 1 })
+        .skip(skip)
+        .limit(options.pageSize)
+        .lean(),
+      ProductModel.countDocuments(filter),
+    ]);
+    const items = docs.map((doc) =>
+      toProduct(doc as Record<string, unknown>)
+    );
+    return buildPaginatedResult(
+      items,
+      total,
+      options.page,
+      options.pageSize
+    );
   },
 
   async findById(id: string): Promise<Product | null> {

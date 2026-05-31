@@ -1,5 +1,9 @@
 import type { Business, BusinessType } from "@/domain/types";
 import { mapId, toObjectId } from "@/lib/map-document";
+import {
+  buildPaginatedResult,
+  type PaginatedResult,
+} from "@/lib/pagination";
 import { BusinessModel } from "@/models/business.model";
 
 function toBusiness(doc: Record<string, unknown>): Business {
@@ -15,6 +19,27 @@ export const businessRepository = {
     const filter = activeOnly ? { isActive: true } : {};
     const docs = await BusinessModel.find(filter).sort({ name: 1 }).lean();
     return docs.map((doc) => toBusiness(doc as Record<string, unknown>));
+  },
+
+  async findAllPaginated(
+    activeOnly: boolean,
+    page: number,
+    pageSize: number
+  ): Promise<PaginatedResult<Business>> {
+    const filter = activeOnly ? { isActive: true } : {};
+    const skip = (page - 1) * pageSize;
+    const [docs, total] = await Promise.all([
+      BusinessModel.find(filter)
+        .sort({ name: 1 })
+        .skip(skip)
+        .limit(pageSize)
+        .lean(),
+      BusinessModel.countDocuments(filter),
+    ]);
+    const items = docs.map((doc) =>
+      toBusiness(doc as Record<string, unknown>)
+    );
+    return buildPaginatedResult(items, total, page, pageSize);
   },
 
   async findById(id: string): Promise<Business | null> {

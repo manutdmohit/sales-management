@@ -6,6 +6,9 @@ import { toast } from "sonner";
 import { useBusiness } from "@/lib/business-context";
 import { useConfirm } from "@/components/ui/confirm-provider";
 import type { Product } from "@/domain/types";
+import { DEFAULT_PAGE_SIZE, type PaginationMeta } from "@/lib/pagination";
+import { fetchList } from "@/lib/fetch-list";
+import { Pagination } from "@/components/ui/pagination";
 import { BUSINESS_TYPE_LABELS } from "@/domain/business-types";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -52,6 +55,8 @@ export default function ProductsPage() {
   const { businessId, businesses, loading: businessLoading } = useBusiness();
   const { confirm } = useConfirm();
   const [products, setProducts] = useState<Product[]>([]);
+  const [meta, setMeta] = useState<PaginationMeta | null>(null);
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
@@ -63,16 +68,28 @@ export default function ProductsPage() {
 
   const loadProducts = useCallback(async () => {
     if (!businessId) return;
-    const params = new URLSearchParams({ businessId, all: "true" });
+    const params = new URLSearchParams({
+      businessId,
+      all: "true",
+      page: String(page),
+      pageSize: String(DEFAULT_PAGE_SIZE),
+    });
     if (search.trim()) params.set("search", search.trim());
-    const res = await fetch(`/api/products?${params}`);
-    const json = await res.json();
-    setProducts(json.data ?? []);
-  }, [businessId, search]);
+    const { items, meta: listMeta } = await fetchList<Product>(
+      `/api/products?${params}`
+    );
+    setProducts(items);
+    setMeta(listMeta);
+  }, [businessId, search, page]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [businessId]);
 
   useEffect(() => {
     if (!businessId) {
       setProducts([]);
+      setMeta(null);
       setLoading(false);
       return;
     }
@@ -235,9 +252,18 @@ export default function ProductsPage() {
         <Input
           placeholder="Search name or SKU…"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setPage(1);
+          }}
         />
-        <Button variant="outline" onClick={() => loadProducts()}>
+        <Button
+          variant="outline"
+          onClick={() => {
+            setPage(1);
+            loadProducts();
+          }}
+        >
           Search
         </Button>
       </div>
@@ -330,6 +356,10 @@ export default function ProductsPage() {
           </TableBody>
         </Table>
       </div>
+
+      {meta && meta.totalPages > 1 && (
+        <Pagination meta={meta} onPageChange={setPage} />
+      )}
 
       <Sheet open={mode !== null} onOpenChange={(open) => !open && closeSheet()}>
         <SheetContent>

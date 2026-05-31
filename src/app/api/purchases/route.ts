@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import { createPurchaseSchema } from "@/schemas/purchase.schema";
 import { purchaseService } from "@/services/purchase.service";
-import { ensureProtectedApi, parseQueryBusinessId } from "@/lib/api";
+import {
+  ensureProtectedApi,
+  parsePaginationParams,
+  parseQueryBusinessId,
+} from "@/lib/api";
+import { jsonListResponse } from "@/lib/paginated-response";
 import { toErrorResponse, AppError } from "@/lib/errors";
 
 export async function GET(request: Request) {
@@ -12,8 +17,14 @@ export async function GET(request: Request) {
     if (!businessId) {
       throw new AppError("businessId query parameter is required", 400);
     }
-    const purchases = await purchaseService.list(businessId);
-    return NextResponse.json({ data: purchases });
+    const pagination = parsePaginationParams(searchParams);
+    const purchases = await purchaseService.list(businessId, {
+      ...(pagination && {
+        page: pagination.page,
+        pageSize: pagination.pageSize,
+      }),
+    });
+    return jsonListResponse(purchases);
   } catch (error) {
     const { status, body } = toErrorResponse(error);
     return NextResponse.json(body, { status });

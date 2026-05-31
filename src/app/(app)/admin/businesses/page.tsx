@@ -6,6 +6,9 @@ import { toast } from "sonner";
 import { useBusiness } from "@/lib/business-context";
 import { useConfirm } from "@/components/ui/confirm-provider";
 import type { Business, BusinessType } from "@/domain/types";
+import { DEFAULT_PAGE_SIZE, type PaginationMeta } from "@/lib/pagination";
+import { fetchList } from "@/lib/fetch-list";
+import { Pagination } from "@/components/ui/pagination";
 import {
   BUSINESS_TYPES,
   BUSINESS_TYPE_LABELS,
@@ -53,6 +56,8 @@ export default function AdminBusinessesPage() {
   const { refresh: refreshContext } = useBusiness();
   const { confirm } = useConfirm();
   const [businesses, setBusinesses] = useState<Business[]>([]);
+  const [meta, setMeta] = useState<PaginationMeta | null>(null);
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [mode, setMode] = useState<FormMode>(null);
@@ -60,10 +65,17 @@ export default function AdminBusinessesPage() {
   const [form, setForm] = useState(emptyForm);
 
   const loadBusinesses = useCallback(async () => {
-    const res = await fetch("/api/businesses?all=true");
-    const json = await res.json();
-    setBusinesses(json.data ?? []);
-  }, []);
+    const params = new URLSearchParams({
+      all: "true",
+      page: String(page),
+      pageSize: String(DEFAULT_PAGE_SIZE),
+    });
+    const { items, meta: listMeta } = await fetchList<Business>(
+      `/api/businesses?${params}`
+    );
+    setBusinesses(items);
+    setMeta(listMeta);
+  }, [page]);
 
   useEffect(() => {
     loadBusinesses().finally(() => setLoading(false));
@@ -252,6 +264,10 @@ export default function AdminBusinessesPage() {
           </TableBody>
         </Table>
       </div>
+
+      {meta && meta.totalPages > 1 && (
+        <Pagination meta={meta} onPageChange={setPage} />
+      )}
 
       <Sheet open={mode !== null} onOpenChange={(open) => !open && closeSheet()}>
         <SheetContent>

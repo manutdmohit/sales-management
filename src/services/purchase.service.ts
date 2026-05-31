@@ -1,6 +1,7 @@
 import type { Purchase, PurchaseItem } from "@/domain/types";
 import { eventBus } from "@/lib/events/event-bus";
 import { AppError } from "@/lib/errors";
+import type { PaginatedResult } from "@/lib/pagination";
 import { batchRepository } from "@/repositories/batch.repository";
 import { inventoryRepository } from "@/repositories/inventory.repository";
 import { purchaseRepository } from "@/repositories/purchase.repository";
@@ -12,8 +13,18 @@ import type { createPurchaseSchema } from "@/schemas/purchase.schema";
 type CreatePurchaseInput = z.infer<typeof createPurchaseSchema>;
 
 export const purchaseService = {
-  async list(businessId: string) {
+  async list(
+    businessId: string,
+    options?: { page?: number; pageSize?: number }
+  ): Promise<Purchase[] | PaginatedResult<Purchase>> {
     await businessService.getById(businessId);
+    if (options?.page != null && options?.pageSize != null) {
+      return purchaseRepository.findByBusinessPaginated(
+        businessId,
+        options.page,
+        options.pageSize
+      );
+    }
     return purchaseRepository.findByBusiness(businessId);
   },
 

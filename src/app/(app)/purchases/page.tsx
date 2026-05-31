@@ -6,6 +6,9 @@ import { toast } from "sonner";
 import { useBusiness } from "@/lib/business-context";
 import { useConfirm } from "@/components/ui/confirm-provider";
 import type { Product, Purchase } from "@/domain/types";
+import { DEFAULT_PAGE_SIZE, type PaginationMeta } from "@/lib/pagination";
+import { fetchList } from "@/lib/fetch-list";
+import { Pagination } from "@/components/ui/pagination";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -54,6 +57,8 @@ export default function PurchasesPage() {
   const { businessId, businesses, loading: businessLoading } = useBusiness();
   const { confirm } = useConfirm();
   const [purchases, setPurchases] = useState<Purchase[]>([]);
+  const [purchaseMeta, setPurchaseMeta] = useState<PaginationMeta | null>(null);
+  const [purchasePage, setPurchasePage] = useState(1);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -65,16 +70,27 @@ export default function PurchasesPage() {
 
   const loadPurchases = useCallback(async () => {
     if (!businessId) return;
-    const res = await fetch(`/api/purchases?businessId=${businessId}`);
-    const json = await res.json();
-    setPurchases(json.data ?? []);
-  }, [businessId]);
+    const params = new URLSearchParams({
+      businessId,
+      page: String(purchasePage),
+      pageSize: String(DEFAULT_PAGE_SIZE),
+    });
+    const { items, meta } = await fetchList<Purchase>(
+      `/api/purchases?${params}`
+    );
+    setPurchases(items);
+    setPurchaseMeta(meta);
+  }, [businessId, purchasePage]);
 
   const loadProducts = useCallback(async () => {
     if (!businessId) return;
     const res = await fetch(`/api/products?businessId=${businessId}`);
     const json = await res.json();
     setProducts(json.data ?? []);
+  }, [businessId]);
+
+  useEffect(() => {
+    setPurchasePage(1);
   }, [businessId]);
 
   useEffect(() => {
@@ -277,6 +293,10 @@ export default function PurchasesPage() {
           </TableBody>
         </Table>
       </div>
+
+      {purchaseMeta && purchaseMeta.totalPages > 1 && (
+        <Pagination meta={purchaseMeta} onPageChange={setPurchasePage} />
+      )}
 
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent className="sm:max-w-lg">

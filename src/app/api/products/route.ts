@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import { createProductSchema } from "@/schemas/product.schema";
 import { productService } from "@/services/product.service";
-import { ensureProtectedApi, parseQueryBusinessId } from "@/lib/api";
+import {
+  ensureProtectedApi,
+  parsePaginationParams,
+  parseQueryBusinessId,
+} from "@/lib/api";
+import { jsonListResponse } from "@/lib/paginated-response";
 import { toErrorResponse, AppError } from "@/lib/errors";
 
 export async function GET(request: Request) {
@@ -14,11 +19,16 @@ export async function GET(request: Request) {
     }
     const search = searchParams.get("search") ?? undefined;
     const includeInactive = searchParams.get("all") === "true";
+    const pagination = parsePaginationParams(searchParams);
     const products = await productService.list(businessId, {
       search,
       includeInactive,
+      ...(pagination && {
+        page: pagination.page,
+        pageSize: pagination.pageSize,
+      }),
     });
-    return NextResponse.json({ data: products });
+    return jsonListResponse(products);
   } catch (error) {
     const { status, body } = toErrorResponse(error);
     return NextResponse.json(body, { status });

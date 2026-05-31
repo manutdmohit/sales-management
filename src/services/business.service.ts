@@ -1,4 +1,5 @@
 import { AppError } from "@/lib/errors";
+import type { PaginatedResult } from "@/lib/pagination";
 import { businessRepository } from "@/repositories/business.repository";
 import { productRepository } from "@/repositories/product.repository";
 import type { Business } from "@/domain/types";
@@ -12,8 +13,20 @@ type CreateBusinessInput = z.infer<typeof createBusinessSchema>;
 type UpdateBusinessInput = z.infer<typeof updateBusinessSchema>;
 
 export const businessService = {
-  async list(options?: { includeInactive?: boolean }): Promise<Business[]> {
-    return businessRepository.findAll(options?.includeInactive !== true);
+  async list(options?: {
+    includeInactive?: boolean;
+    page?: number;
+    pageSize?: number;
+  }): Promise<Business[] | PaginatedResult<Business>> {
+    const activeOnly = options?.includeInactive !== true;
+    if (options?.page != null && options?.pageSize != null) {
+      return businessRepository.findAllPaginated(
+        activeOnly,
+        options.page,
+        options.pageSize
+      );
+    }
+    return businessRepository.findAll(activeOnly);
   },
 
   async getById(id: string): Promise<Business> {

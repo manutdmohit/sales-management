@@ -5,6 +5,9 @@ import { PackagePlus, SlidersHorizontal } from "lucide-react";
 import { toast } from "sonner";
 import { useBusiness } from "@/lib/business-context";
 import type { StockSummary } from "@/domain/types";
+import { DEFAULT_PAGE_SIZE, type PaginationMeta } from "@/lib/pagination";
+import { fetchList } from "@/lib/fetch-list";
+import { Pagination } from "@/components/ui/pagination";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,6 +32,8 @@ import {
 export default function InventoryPage() {
   const { businessId, businesses, loading: businessLoading } = useBusiness();
   const [rows, setRows] = useState<StockSummary[]>([]);
+  const [meta, setMeta] = useState<PaginationMeta | null>(null);
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [adjustOpen, setAdjustOpen] = useState(false);
@@ -38,9 +43,20 @@ export default function InventoryPage() {
 
   const loadRows = useCallback(async () => {
     if (!businessId) return;
-    const res = await fetch(`/api/inventory?businessId=${businessId}`);
-    const json = await res.json();
-    setRows(json.data ?? []);
+    const params = new URLSearchParams({
+      businessId,
+      page: String(page),
+      pageSize: String(DEFAULT_PAGE_SIZE),
+    });
+    const { items, meta: listMeta } = await fetchList<StockSummary>(
+      `/api/inventory?${params}`
+    );
+    setRows(items);
+    setMeta(listMeta);
+  }, [businessId, page]);
+
+  useEffect(() => {
+    setPage(1);
   }, [businessId]);
 
   useEffect(() => {
@@ -186,6 +202,10 @@ export default function InventoryPage() {
           </TableBody>
         </Table>
       </div>
+
+      {meta && meta.totalPages > 1 && (
+        <Pagination meta={meta} onPageChange={setPage} />
+      )}
 
       <Sheet open={adjustOpen} onOpenChange={setAdjustOpen}>
         <SheetContent>

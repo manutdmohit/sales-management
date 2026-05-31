@@ -8,6 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import type { Product } from "@/domain/types";
+import { DEFAULT_PAGE_SIZE, type PaginationMeta } from "@/lib/pagination";
+import { fetchList } from "@/lib/fetch-list";
+import { Pagination } from "@/components/ui/pagination";
 
 type CartItem = {
   productId: string;
@@ -20,29 +23,42 @@ export default function PosPage() {
   const { businessId } = useBusiness();
   const { confirm } = useConfirm();
   const [products, setProducts] = useState<Product[]>([]);
+  const [meta, setMeta] = useState<PaginationMeta | null>(null);
+  const [page, setPage] = useState(1);
   const [stockMap, setStockMap] = useState<Map<string, number>>(new Map());
   const [search, setSearch] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
 
-  const loadProducts = useCallback(() => {
+  const loadProducts = useCallback(async () => {
     if (!businessId) return;
-    const q = search ? `&search=${encodeURIComponent(search)}` : "";
-    Promise.all([
-      fetch(`/api/products?businessId=${businessId}${q}`).then((r) => r.json()),
-      fetch(`/api/inventory?businessId=${businessId}`).then((r) => r.json()),
-    ]).then(([productsJson, inventoryJson]) => {
-      setProducts(productsJson.data ?? []);
-      const map = new Map<string, number>();
-      for (const row of inventoryJson.data ?? []) {
-        map.set(row.productId, row.stock);
-      }
-      setStockMap(map);
+    const params = new URLSearchParams({
+      businessId,
+      page: String(page),
+      pageSize: String(DEFAULT_PAGE_SIZE),
     });
-  }, [businessId, search]);
+    if (search.trim()) params.set("search", search.trim());
+    const [productList, inventoryRes] = await Promise.all([
+      fetchList<Product>(`/api/products?${params}`),
+      fetch(`/api/inventory?businessId=${businessId}`).then((r) => r.json()),
+    ]);
+    setProducts(productList.items);
+    setMeta(productList.meta);
+    const map = new Map<string, number>();
+    for (const row of inventoryRes.data ?? []) {
+      map.set(row.productId, row.stock);
+    }
+    setStockMap(map);
+  }, [businessId, search, page]);
 
   useEffect(() => {
-    const t = setTimeout(loadProducts, 200);
+    setPage(1);
+  }, [businessId]);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      void loadProducts();
+    }, 200);
     return () => clearTimeout(t);
   }, [loadProducts]);
 
@@ -131,7 +147,10 @@ export default function PosPage() {
         <Input
           placeholder="Search products (name or SKU)…"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setPage(1);
+          }}
           autoFocus
         />
         <div className="max-h-[420px] space-y-2 overflow-y-auto rounded-md border p-2">
@@ -162,7 +181,15 @@ export default function PosPage() {
             </button>
             );
           })}
+          {products.length === 0 && (
+            <p className="px-3 py-6 text-center text-sm text-muted-foreground">
+              No products match your search.
+            </p>
+          )}
         </div>
+        {meta && meta.totalPages > 1 && (
+          <Pagination meta={meta} onPageChange={setPage} />
+        )}
       </div>
       <Card>
         <CardHeader>

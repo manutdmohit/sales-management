@@ -755,8 +755,8 @@ export default function ReportsPage() {
           )}
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border">
-            <Table>
+          <div className="rounded-md border overflow-x-auto">
+            <Table className="min-w-[36rem] text-xs md:min-w-0 md:text-sm">
               <TableHeader>
                 <TableRow>
                   <TableHead>Period</TableHead>
@@ -797,7 +797,7 @@ export default function ReportsPage() {
                       key={b.date}
                       className={cn(b.count === 0 && "text-muted-foreground")}
                     >
-                      <TableCell>{b.label}</TableCell>
+                      <TableCell className="whitespace-normal">{b.label}</TableCell>
                       {isProfitReport && showServicesReport ? (
                         <>
                           <TableCell className="text-right">

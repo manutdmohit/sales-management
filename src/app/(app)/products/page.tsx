@@ -744,6 +744,7 @@ export default function ProductsPage() {
         sort={sort}
         dir={dir}
         onSortChange={handleSort}
+        mobileLayout="cards"
         renderMobileCard={(p) => (
           <ProductMobileCard
             product={p}

@@ -916,6 +916,7 @@ export default function PosPage() {
                 cell: (p) => renderProductActions(p),
               },
             ]}
+            mobileLayout="cards"
             renderMobileCard={(p) => {
               const stock = stockMap.get(p._id) ?? 0;
               const inCart =

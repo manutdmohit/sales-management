@@ -47,6 +47,8 @@ type DataTableProps<T> = {
   onSortChange?: (key: string, dir: SortDir) => void;
   /** Fully custom mobile card; when omitted, cards are built from column metadata. */
   renderMobileCard?: (row: T) => ReactNode;
+  /** Mobile layout: scrollable table (default) or stacked cards. */
+  mobileLayout?: "table" | "cards";
 };
 
 function hasHeader(header: ReactNode): boolean {
@@ -73,6 +75,10 @@ function partitionColumns<T>(columns: DataTableColumn<T>[]) {
   return { primary, details, actions };
 }
 
+function getMobileColumns<T>(columns: DataTableColumn<T>[]) {
+  return columns.filter((c) => !c.hideOnMobile || c.mobileActions);
+}
+
 function AutoMobileCard<T>({
   row,
   columns,
@@ -92,23 +98,32 @@ function AutoMobileCard<T>({
         </div>
       )}
       {details.length > 0 && (
-        <div className="grid grid-cols-2 gap-x-4 gap-y-3 px-4 py-3.5">
-          {details.map((col) => (
-            <div key={col.id} className="min-w-0 space-y-1">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                {col.header}
-              </p>
-              <div
-                className={cn(
-                  "text-sm font-medium leading-snug [&_.font-mono]:text-[13px]",
-                  col.className?.includes("text-right") && "text-left",
-                  col.className
-                )}
-              >
-                {col.cell(row)}
-              </div>
-            </div>
-          ))}
+        <div className="overflow-x-auto px-4 py-1">
+          <table className="w-full text-sm">
+            <tbody>
+              {details.map((col) => (
+                <tr
+                  key={col.id}
+                  className="border-b border-border/30 last:border-0"
+                >
+                  <th
+                    scope="row"
+                    className="py-2.5 pr-3 text-left align-top text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"
+                  >
+                    {col.header}
+                  </th>
+                  <td
+                    className={cn(
+                      "py-2.5 text-right align-top font-medium [&_.font-mono]:text-[13px]",
+                      col.className
+                    )}
+                  >
+                    {col.cell(row)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
       {actions.length > 0 && (
@@ -134,6 +149,7 @@ function TableSection<T>({
   sort,
   dir,
   onSortChange,
+  mobile = false,
 }: {
   columns: DataTableColumn<T>[];
   data: T[];
@@ -144,17 +160,24 @@ function TableSection<T>({
   sort?: string;
   dir?: SortDir;
   onSortChange?: (key: string, dir: SortDir) => void;
+  mobile?: boolean;
 }) {
   return (
-    <div className="overflow-x-auto">
-      <Table>
+    <div className={cn("overflow-x-auto", mobile && "-webkit-overflow-scrolling-touch")}>
+      <Table className={mobile ? "min-w-full text-xs" : undefined}>
         <TableHeader>
           <TableRow>
             {columns.map((col) => {
               const sortable = Boolean(col.sortKey && onSortChange);
               const active = sortable && sort === col.sortKey;
               return (
-                <TableHead key={col.id} className={col.headerClassName}>
+                <TableHead
+                  key={col.id}
+                  className={cn(
+                    col.headerClassName,
+                    mobile && "whitespace-normal px-2 text-xs"
+                  )}
+                >
                   {sortable ? (
                     <button
                       type="button"
@@ -213,7 +236,13 @@ function TableSection<T>({
             data.map((row) => (
               <TableRow key={rowKey(row)}>
                 {columns.map((col) => (
-                  <TableCell key={col.id} className={col.className}>
+                  <TableCell
+                    key={col.id}
+                    className={cn(
+                      col.className,
+                      mobile && "max-w-[45vw] whitespace-normal align-top text-xs sm:max-w-none"
+                    )}
+                  >
                     {col.cell(row)}
                   </TableCell>
                 ))}
@@ -238,11 +267,15 @@ export function DataTable<T>({
   dir,
   onSortChange,
   renderMobileCard,
+  mobileLayout = "table",
 }: DataTableProps<T>) {
   const { pageSize, setPageSize } = useTableSettings();
   const colSpan = columns.length;
+  const mobileColumns = getMobileColumns(columns);
+  const useMobileCards =
+    mobileLayout === "cards" && Boolean(renderMobileCard);
 
-  const mobileList = (
+  const mobileCardList = (
     <div className="space-y-3 md:hidden">
       {loading && (
         <p className="py-10 text-center text-sm text-muted-foreground">
@@ -269,6 +302,25 @@ export function DataTable<T>({
     </div>
   );
 
+  const mobileTable = (
+    <div className="md:hidden">
+      <div className="overflow-hidden rounded-xl border border-border/50 bg-card shadow-sm ring-1 ring-foreground/[0.03]">
+        <TableSection
+          columns={mobileColumns}
+          data={data}
+          rowKey={rowKey}
+          loading={loading}
+          emptyMessage={emptyMessage}
+          colSpan={mobileColumns.length}
+          sort={sort}
+          dir={dir}
+          onSortChange={onSortChange}
+          mobile
+        />
+      </div>
+    </div>
+  );
+
   return (
     <div
       className={cn(
@@ -276,7 +328,7 @@ export function DataTable<T>({
         className
       )}
     >
-      {mobileList}
+      {useMobileCards ? mobileCardList : mobileTable}
       <div className="hidden md:block">
         <TableSection
           columns={columns}

@@ -152,7 +152,13 @@ function SidebarBrand() {
   return (
     <div className="border-b border-sidebar-border px-4 py-5">
       <div className="flex items-start gap-3">
-        <BusinessLogo logoUrl={logoUrl} name={name} size="md" />
+        <Link
+          href="/"
+          className="shrink-0 rounded-xl ring-offset-sidebar transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+          aria-label="Go to dashboard"
+        >
+          <BusinessLogo logoUrl={logoUrl} name={name} size="md" />
+        </Link>
         <div className="min-w-0 leading-tight">
           <h1 className="truncate text-sm font-semibold text-sidebar-foreground">
             {name}

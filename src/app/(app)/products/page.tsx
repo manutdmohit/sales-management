@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Pencil, Plus, Trash2, FolderOpen } from "lucide-react";
+import { Pencil, Plus, Trash2, FolderOpen, Search } from "lucide-react";
 import { toast } from "sonner";
 import { useBusiness } from "@/lib/business-context";
 import { useConfirm } from "@/components/ui/confirm-provider";
@@ -52,6 +52,183 @@ function slugify(value: string) {
     .trim()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
+}
+
+function ProductRowActions({
+  product,
+  onEdit,
+  onToggleActive,
+  compact = false,
+}: {
+  product: Product;
+  onEdit: (p: Product) => void;
+  onToggleActive: (p: Product) => void;
+  compact?: boolean;
+}) {
+  if (compact) {
+    return (
+      <div className="flex gap-1">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-9 min-h-9 touch-manipulation px-3"
+          onClick={() => onEdit(product)}
+        >
+          <Pencil className="size-3.5" />
+          Edit
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-9 min-h-9 touch-manipulation px-3 text-muted-foreground"
+          onClick={() => onToggleActive(product)}
+        >
+          <Trash2 className="size-3.5" />
+          {product.isActive ? "Off" : "On"}
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex justify-end gap-1">
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        onClick={() => onEdit(product)}
+        aria-label={`Edit ${product.name}`}
+      >
+        <Pencil className="size-4" />
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        onClick={() => onToggleActive(product)}
+        aria-label={
+          product.isActive ? `Deactivate ${product.name}` : `Reactivate ${product.name}`
+        }
+      >
+        <Trash2 className="size-4" />
+      </Button>
+    </div>
+  );
+}
+
+function ProductMobileCard({
+  product,
+  categoryName,
+  isManufacturer,
+  onEdit,
+  onToggleActive,
+}: {
+  product: Product;
+  categoryName?: string;
+  isManufacturer: boolean;
+  onEdit: (p: Product) => void;
+  onToggleActive: (p: Product) => void;
+}) {
+  const cost = product.pricing.unitCost ?? product.pricing.purchase;
+  const margin = product.pricing.selling - cost;
+  const marginPct =
+    product.pricing.selling > 0
+      ? ((product.pricing.selling - cost) / product.pricing.selling) * 100
+      : 0;
+
+  const meta = [
+    categoryName,
+    product.sku,
+    getUnitSymbol(product.unitId),
+  ].filter(Boolean);
+
+  return (
+    <article className="overflow-hidden rounded-2xl border border-border/50 bg-card shadow-sm ring-1 ring-foreground/[0.03]">
+      <div className="flex items-start justify-between gap-3 px-4 pb-3 pt-4">
+        <div className="min-w-0 flex-1">
+          <h3 className="text-base font-semibold leading-snug tracking-tight">
+            {product.name}
+          </h3>
+          {meta.length > 0 && (
+            <p className="mt-1 truncate text-xs text-muted-foreground">
+              {meta.join(" · ")}
+            </p>
+          )}
+          {isManufacturer && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              <Badge
+                variant={product.productKind === "RAW" ? "secondary" : "default"}
+                className="text-[10px]"
+              >
+                {product.productKind === "RAW" ? "Raw" : "Finished"}
+              </Badge>
+              {product.trackExpiry && (
+                <Badge variant="outline" className="text-[10px]">
+                  Expiry tracked
+                </Badge>
+              )}
+            </div>
+          )}
+        </div>
+        <Badge
+          variant={product.isActive ? "secondary" : "outline"}
+          className="shrink-0"
+        >
+          {product.isActive ? "Active" : "Inactive"}
+        </Badge>
+      </div>
+
+      <div className="grid grid-cols-2 divide-x divide-border/40 border-y border-border/40 bg-muted/20">
+        <div className="px-4 py-3.5">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Selling
+          </p>
+          <p className="mt-1 font-mono text-2xl font-semibold tabular-nums tracking-tight">
+            {product.pricing.selling.toFixed(2)}
+          </p>
+        </div>
+        <div className="px-4 py-3.5">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Margin
+          </p>
+          <p className="mt-1 font-mono text-xl font-semibold tabular-nums text-chart-2">
+            {product.pricing.selling > 0 ? `${marginPct.toFixed(1)}%` : "—"}
+          </p>
+          <p className="font-mono text-xs tabular-nums text-muted-foreground">
+            {margin.toFixed(2)}
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 px-4 py-3 text-xs">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Purchase
+          </p>
+          <p className="mt-0.5 font-mono font-medium tabular-nums">
+            {product.pricing.purchase.toFixed(2)}
+          </p>
+        </div>
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Min stock
+          </p>
+          <p className="mt-0.5 font-mono font-medium tabular-nums">
+            {formatQuantityWithUnit(product.minStock, product.unitId)}
+          </p>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-end border-t border-border/40 bg-muted/10 px-3 py-2.5">
+        <ProductRowActions
+          product={product}
+          onEdit={onEdit}
+          onToggleActive={onToggleActive}
+          compact
+        />
+      </div>
+    </article>
+  );
 }
 
 export default function ProductsPage() {
@@ -145,6 +322,7 @@ export default function ProductsPage() {
         id: "name",
         header: "Name",
         sortKey: "name",
+        mobilePrimary: true,
         cell: (p: Product) => (
           <span className="font-medium">{p.name}</span>
         ),
@@ -152,6 +330,7 @@ export default function ProductsPage() {
       {
         id: "category",
         header: "Category",
+        hideOnMobile: true,
         cell: (p: Product) =>
           p.categoryId ? (
             categoryById.get(p.categoryId)?.name ?? "—"
@@ -162,6 +341,7 @@ export default function ProductsPage() {
       {
         id: "type",
         header: "Business type",
+        hideOnMobile: true,
         cell: (p: Product) => (
           <Badge variant="outline">
             {businessTypeLabel(p.businessType)}
@@ -173,6 +353,7 @@ export default function ProductsPage() {
             {
               id: "productKind",
               header: "Kind",
+              hideOnMobile: true,
               cell: (p: Product) => (
                 <Badge variant={p.productKind === "RAW" ? "secondary" : "default"}>
                   {p.productKind === "RAW" ? "Raw" : "Finished"}
@@ -185,6 +366,7 @@ export default function ProductsPage() {
         id: "sku",
         header: "SKU",
         sortKey: "sku",
+        hideOnMobile: true,
         cell: (p: Product) => (
           <span className="font-mono text-sm">{p.sku}</span>
         ),
@@ -192,6 +374,7 @@ export default function ProductsPage() {
       {
         id: "unit",
         header: "Unit",
+        hideOnMobile: true,
         cell: (p: Product) => (
           <span className="text-muted-foreground">
             {getUnitSymbol(p.unitId) ?? "—"}
@@ -201,6 +384,7 @@ export default function ProductsPage() {
       {
         id: "purchase",
         header: "Purchase",
+        hideOnMobile: true,
         headerClassName: "text-right",
         className: "text-right font-mono",
         cell: (p: Product) => p.pricing.purchase.toFixed(2),
@@ -209,6 +393,7 @@ export default function ProductsPage() {
         id: "selling",
         header: "Selling",
         sortKey: "pricing.selling",
+        hideOnMobile: true,
         headerClassName: "text-right",
         className: "text-right font-mono",
         cell: (p: Product) => p.pricing.selling.toFixed(2),
@@ -216,6 +401,7 @@ export default function ProductsPage() {
       {
         id: "unitCost",
         header: "Unit cost",
+        hideOnMobile: true,
         headerClassName: "text-right",
         className: "text-right font-mono",
         cell: (p: Product) => {
@@ -226,6 +412,7 @@ export default function ProductsPage() {
       {
         id: "margin",
         header: "Margin",
+        hideOnMobile: true,
         headerClassName: "text-right",
         className: "text-right font-mono",
         cell: (p: Product) => {
@@ -237,6 +424,7 @@ export default function ProductsPage() {
       {
         id: "marginPct",
         header: "Margin %",
+        hideOnMobile: true,
         headerClassName: "text-right",
         className: "text-right font-mono",
         cell: (p: Product) => {
@@ -250,16 +438,19 @@ export default function ProductsPage() {
         id: "minStock",
         header: "Min stock",
         sortKey: "minStock",
+        hideOnMobile: true,
         cell: (p: Product) => formatQuantityWithUnit(p.minStock, p.unitId),
       },
       {
         id: "expiry",
         header: "Expiry",
+        hideOnMobile: true,
         cell: (p: Product) => (p.trackExpiry ? "Yes" : "No"),
       },
       {
         id: "status",
         header: "Status",
+        hideOnMobile: true,
         cell: (p: Product) =>
           p.isActive ? (
             <Badge variant="secondary">Active</Badge>
@@ -270,29 +461,15 @@ export default function ProductsPage() {
       {
         id: "actions",
         header: "Actions",
+        mobileActions: true,
         headerClassName: "text-right",
         className: "text-right",
         cell: (p: Product) => (
-          <div className="flex justify-end gap-1">
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={() => openEdit(p)}
-              aria-label={`Edit ${p.name}`}
-            >
-              <Pencil className="size-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={() => toggleActive(p)}
-              aria-label={
-                p.isActive ? `Deactivate ${p.name}` : `Reactivate ${p.name}`
-              }
-            >
-              <Trash2 className="size-4" />
-            </Button>
-          </div>
+          <ProductRowActions
+            product={p}
+            onEdit={openEdit}
+            onToggleActive={toggleActive}
+          />
         ),
       },
     ],
@@ -458,11 +635,19 @@ export default function ProductsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-semibold">Products</h2>
-          <p className="text-muted-foreground">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 space-y-1">
+          <h2 className="text-xl font-semibold tracking-tight sm:text-2xl">
+            Products
+          </h2>
+          <p className="text-sm text-muted-foreground sm:hidden">
+            Catalog for{" "}
+            <span className="font-medium text-foreground">
+              {selectedBusiness?.name}
+            </span>
+          </p>
+          <p className="hidden text-sm text-muted-foreground sm:block">
             Manage catalog for{" "}
             <span className="font-medium text-foreground">
               {selectedBusiness?.name}
@@ -476,55 +661,70 @@ export default function ProductsPage() {
             production, and sales.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => setCategoriesOpen(true)}>
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0 sm:flex-wrap">
+          <Button
+            variant="outline"
+            className="min-h-10 touch-manipulation"
+            onClick={() => setCategoriesOpen(true)}
+          >
             <FolderOpen className="size-4" />
-            Categories
+            <span className="truncate">Categories</span>
           </Button>
-          <Button onClick={openCreate}>
+          <Button className="min-h-10 touch-manipulation" onClick={openCreate}>
             <Plus className="size-4" />
             Add product
           </Button>
         </div>
       </div>
 
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="flex max-w-sm flex-1 gap-2">
-          <Input
-            placeholder="Search name or SKU…"
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
-          />
-          <Button variant="outline" onClick={() => loadProducts()}>
-            Search
-          </Button>
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="category-filter" className="text-xs text-muted-foreground">
-            Category
-          </Label>
-          <select
-            id="category-filter"
-            className="h-9 min-w-[10rem] rounded-md border bg-background px-3 text-sm"
-            value={categoryFilter}
-            onChange={(e) => {
-              setCategoryFilter(e.target.value);
-              setPage(1);
-            }}
-          >
-            <option value="ALL">All categories</option>
-            <option value="uncategorized">Uncategorized</option>
-            {categories
-              .filter((c) => c.isActive)
-              .map((c) => (
-                <option key={c._id} value={c._id}>
-                  {c.name}
-                </option>
-              ))}
-          </select>
+      <div className="rounded-2xl border border-border/50 bg-card/90 p-3 shadow-sm ring-1 ring-foreground/[0.03] sm:p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <div className="relative min-w-0 flex-1">
+            <Label htmlFor="product-search" className="sr-only">
+              Search products
+            </Label>
+            <Search
+              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+              aria-hidden
+            />
+            <Input
+              id="product-search"
+              placeholder="Search name or SKU…"
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+              className="h-11 pl-9 text-base sm:text-sm"
+            />
+          </div>
+          <div className="min-w-0 space-y-1.5 sm:w-48">
+            <Label
+              htmlFor="category-filter"
+              className="text-xs font-medium text-muted-foreground"
+            >
+              Category
+            </Label>
+            <select
+              id="category-filter"
+              className="flex h-11 w-full cursor-pointer rounded-lg border border-input bg-background px-3 text-base shadow-xs sm:text-sm"
+              value={categoryFilter}
+              onChange={(e) => {
+                setCategoryFilter(e.target.value);
+                setPage(1);
+              }}
+            >
+              <option value="ALL">All categories</option>
+              <option value="uncategorized">Uncategorized</option>
+              {categories
+                .filter((c) => c.isActive)
+                .map((c) => (
+                  <option key={c._id} value={c._id}>
+                    {c.name}
+                  </option>
+                ))}
+            </select>
+          </div>
         </div>
       </div>
 
@@ -544,6 +744,19 @@ export default function ProductsPage() {
         sort={sort}
         dir={dir}
         onSortChange={handleSort}
+        renderMobileCard={(p) => (
+          <ProductMobileCard
+            product={p}
+            categoryName={
+              p.categoryId
+                ? categoryById.get(p.categoryId)?.name
+                : undefined
+            }
+            isManufacturer={isManufacturer}
+            onEdit={openEdit}
+            onToggleActive={toggleActive}
+          />
+        )}
       />
 
       <Sheet open={mode !== null} onOpenChange={(open) => !open && closeSheet()}>

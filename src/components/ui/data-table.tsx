@@ -83,28 +83,38 @@ function AutoMobileCard<T>({
   const { primary, details, actions } = partitionColumns(columns);
 
   return (
-    <article className="rounded-xl border border-border/60 bg-card p-4 shadow-sm">
+    <article className="overflow-hidden rounded-2xl border border-border/50 bg-card shadow-sm ring-1 ring-foreground/[0.03]">
       {primary && (
-        <div className="text-base font-medium leading-snug">
-          {primary.cell(row)}
+        <div className="border-b border-border/40 bg-muted/20 px-4 py-3.5">
+          <div className="text-base font-semibold leading-snug tracking-tight">
+            {primary.cell(row)}
+          </div>
         </div>
       )}
       {details.length > 0 && (
-        <dl className="mt-3 space-y-2 border-t border-border/50 pt-3 text-sm">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-3 px-4 py-3.5">
           {details.map((col) => (
-            <div key={col.id} className="flex items-start justify-between gap-3">
-              <dt className="shrink-0 text-muted-foreground">{col.header}</dt>
-              <dd className={cn("min-w-0 text-right", col.className)}>
+            <div key={col.id} className="min-w-0 space-y-1">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                {col.header}
+              </p>
+              <div
+                className={cn(
+                  "text-sm font-medium leading-snug [&_.font-mono]:text-[13px]",
+                  col.className?.includes("text-right") && "text-left",
+                  col.className
+                )}
+              >
                 {col.cell(row)}
-              </dd>
+              </div>
             </div>
           ))}
-        </dl>
+        </div>
       )}
       {actions.length > 0 && (
-        <div className="mt-3 flex flex-wrap items-center justify-end gap-2 border-t border-border/50 pt-3">
+        <div className="flex flex-wrap items-center justify-end gap-1.5 border-t border-border/40 bg-muted/10 px-3 py-2.5">
           {actions.map((col) => (
-            <div key={col.id} className="min-w-0">
+            <div key={col.id} className="min-w-0 shrink-0">
               {col.cell(row)}
             </div>
           ))}
@@ -233,14 +243,14 @@ export function DataTable<T>({
   const colSpan = columns.length;
 
   const mobileList = (
-    <div className="space-y-3 p-3 md:hidden">
+    <div className="space-y-3 md:hidden">
       {loading && (
-        <p className="py-8 text-center text-sm text-muted-foreground">
+        <p className="py-10 text-center text-sm text-muted-foreground">
           Loading…
         </p>
       )}
       {!loading && data.length === 0 && (
-        <p className="py-8 text-center text-sm text-muted-foreground">
+        <p className="py-10 text-center text-sm text-muted-foreground">
           {emptyMessage}
         </p>
       )}
@@ -262,7 +272,7 @@ export function DataTable<T>({
   return (
     <div
       className={cn(
-        "overflow-hidden rounded-xl border border-border/60 bg-card card-elevated",
+        "overflow-hidden md:rounded-xl md:border md:border-border/60 md:bg-card md:card-elevated",
         className
       )}
     >
@@ -281,7 +291,8 @@ export function DataTable<T>({
         />
       </div>
       {meta && onPageChange && meta.total > 0 && (
-        <Pagination
+        <div className="mt-3 overflow-hidden rounded-2xl border border-border/50 bg-card shadow-sm ring-1 ring-foreground/[0.03] md:mt-0 md:rounded-none md:border-0 md:bg-transparent md:shadow-none md:ring-0">
+          <Pagination
           meta={meta}
           onPageChange={onPageChange}
           pageSize={pageSize}
@@ -290,6 +301,7 @@ export function DataTable<T>({
             onPageChange(1);
           }}
         />
+        </div>
       )}
     </div>
   );

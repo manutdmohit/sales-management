@@ -668,8 +668,8 @@ export default function AppointmentsPage() {
                   }
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="min-w-0 space-y-2">
                   <Label htmlFor="startAt">From</Label>
                   <Input
                     id="startAt"
@@ -679,7 +679,7 @@ export default function AppointmentsPage() {
                     onChange={(e) => handleStartChange(e.target.value)}
                   />
                 </div>
-                <div className="space-y-2">
+                <div className="min-w-0 space-y-2">
                   <Label htmlFor="endAt">To</Label>
                   <Input
                     id="endAt"
@@ -752,8 +752,8 @@ export default function AppointmentsPage() {
               </div>
 
               {isCredit && (
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="min-w-0 space-y-2">
                     <Label htmlFor="booking-due">Due date</Label>
                     <Input
                       id="booking-due"
@@ -762,7 +762,7 @@ export default function AppointmentsPage() {
                       onChange={(e) => setDueDate(e.target.value)}
                     />
                   </div>
-                  <div className="space-y-2">
+                  <div className="min-w-0 space-y-2">
                     <Label htmlFor="booking-paid">Paid now (optional)</Label>
                     <Input
                       id="booking-paid"

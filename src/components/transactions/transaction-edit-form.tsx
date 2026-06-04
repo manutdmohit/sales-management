@@ -273,8 +273,8 @@ export function TransactionEditForm({
 
       {row.kind === "BOOKING" && (
         <>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="min-w-0 space-y-2">
               <Label htmlFor="tx-start">From</Label>
               <Input
                 id="tx-start"
@@ -284,7 +284,7 @@ export function TransactionEditForm({
                 onChange={(e) => setStartAt(e.target.value)}
               />
             </div>
-            <div className="space-y-2">
+            <div className="min-w-0 space-y-2">
               <Label htmlFor="tx-end">To</Label>
               <Input
                 id="tx-end"
@@ -395,8 +395,8 @@ export function TransactionEditForm({
           </div>
 
           {isCredit && (
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="min-w-0 space-y-2">
                 <Label htmlFor="tx-due">Due date</Label>
                 <Input
                   id="tx-due"
@@ -405,7 +405,7 @@ export function TransactionEditForm({
                   onChange={(e) => setDueDate(e.target.value)}
                 />
               </div>
-              <div className="space-y-2">
+              <div className="min-w-0 space-y-2">
                 <Label htmlFor="tx-paid">Paid now (optional)</Label>
                 <Input
                   id="tx-paid"

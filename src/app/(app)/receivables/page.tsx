@@ -18,6 +18,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/ui/data-table";
+import {
+  MobileCardFooter,
+  MobileCardHeader,
+  MobileCardMetrics,
+  MobileCardShell,
+} from "@/components/ui/mobile-card";
+import {
+  ListPageHeader,
+  MobileFilterPanel,
+  MobileSearchField,
+} from "@/components/ui/mobile-list-toolbar";
 import { cn } from "@/lib/utils";
 import {
   Sheet,
@@ -176,58 +187,66 @@ export default function ReceivablesPage() {
   }
 
   return (
-    <div className="animate-in fade-in slide-in-from-bottom-2 space-y-6 duration-500">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-semibold">Receivables</h2>
-          <p className="text-muted-foreground">
+    <div className="animate-in fade-in slide-in-from-bottom-2 space-y-4 duration-500 sm:space-y-6">
+      <ListPageHeader
+        title="Receivables"
+        descriptionMobile={`Outstanding credit for ${selectedBusiness?.name ?? "this business"}.`}
+        description={
+          <>
             Outstanding credit from product sales and service bookings for{" "}
             <span className="font-medium text-foreground">
               {selectedBusiness?.name}
             </span>
             .
-          </p>
-        </div>
-        <div className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1">
-          {[
-            { v: true, label: "Outstanding" },
-            { v: false, label: "All credit" },
-          ].map(({ v, label }) => (
-            <button
-              key={label}
-              type="button"
-              onClick={() => setOutstandingOnly(v)}
-              className={cn(
-                "cursor-pointer rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-                outstandingOnly === v
-                  ? "bg-card text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <Input
-        placeholder="Search by reference, customer name or phone…"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="max-w-sm"
+          </>
+        }
+        actions={
+          <div className="col-span-2 grid grid-cols-2 gap-1 rounded-lg bg-muted p-1 sm:col-span-1 sm:flex sm:w-auto">
+            {[
+              { v: true, label: "Outstanding" },
+              { v: false, label: "All credit" },
+            ].map(({ v, label }) => (
+              <button
+                key={label}
+                type="button"
+                onClick={() => setOutstandingOnly(v)}
+                className={cn(
+                  "cursor-pointer rounded-md px-3 py-2 text-xs font-medium transition-colors sm:py-1.5 sm:text-sm",
+                  outstandingOnly === v
+                    ? "bg-card text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        }
       />
+
+      <MobileFilterPanel>
+        <MobileSearchField
+          id="receivable-search"
+          placeholder="Search reference, customer…"
+          value={search}
+          onChange={setSearch}
+          onPageReset={() => setPage(1)}
+        />
+      </MobileFilterPanel>
 
       <DataTable
         columns={[
           {
             id: "type",
             header: "Type",
+            hideOnMobile: true,
             cell: (r) => sourceBadge(r.source),
           },
           {
             id: "reference",
             header: "Reference",
             sortKey: "createdAt",
+            mobilePrimary: true,
             cell: (r) => (
               <div>
                 <div
@@ -250,6 +269,7 @@ export default function ReceivablesPage() {
             id: "customer",
             header: "Customer",
             sortKey: "customer.name",
+            hideOnMobile: true,
             cell: (r) => (
               <div>
                 <div className="font-medium">{r.customerName}</div>
@@ -265,6 +285,7 @@ export default function ReceivablesPage() {
             id: "due",
             header: "Due date",
             sortKey: "dueDate",
+            hideOnMobile: true,
             cell: (r) => {
               if (!r.dueDate) return "—";
               const overdue =
@@ -280,6 +301,7 @@ export default function ReceivablesPage() {
             id: "total",
             header: "Total",
             sortKey: "total",
+            hideOnMobile: true,
             headerClassName: "text-right",
             className: "text-right font-mono",
             cell: (r) => r.total.toFixed(2),
@@ -287,6 +309,7 @@ export default function ReceivablesPage() {
           {
             id: "paid",
             header: "Paid",
+            hideOnMobile: true,
             headerClassName: "text-right",
             className: "text-right font-mono text-muted-foreground",
             cell: (r) => r.amountPaid.toFixed(2),
@@ -295,6 +318,7 @@ export default function ReceivablesPage() {
             id: "dueAmt",
             header: "Outstanding",
             sortKey: "amountDue",
+            hideOnMobile: true,
             headerClassName: "text-right",
             className: "text-right font-mono font-semibold",
             cell: (r) => r.amountDue.toFixed(2),
@@ -302,11 +326,13 @@ export default function ReceivablesPage() {
           {
             id: "status",
             header: "Status",
+            hideOnMobile: true,
             cell: (r) => statusBadge(r),
           },
           {
             id: "receipt",
             header: "Receipt",
+            hideOnMobile: true,
             cell: (r) => (
               <ReceiptCell receipt={receiptsFromPayments(r.payments)[0]} />
             ),
@@ -314,6 +340,7 @@ export default function ReceivablesPage() {
           {
             id: "actions",
             header: "Actions",
+            mobileActions: true,
             headerClassName: "text-right",
             className: "text-right",
             cell: (r) => (
@@ -340,6 +367,44 @@ export default function ReceivablesPage() {
         sort={sort}
         dir={dir}
         onSortChange={handleSort}
+        renderMobileCard={(r) => (
+          <MobileCardShell>
+            <MobileCardHeader
+              title={r.reference}
+              subtitle={[r.customerName, r.customerPhone].filter(Boolean).join(" · ")}
+              badge={
+                <div className="flex flex-col items-end gap-1">
+                  {sourceBadge(r.source)}
+                  {statusBadge(r)}
+                </div>
+              }
+            />
+            <MobileCardMetrics
+              items={[
+                {
+                  label: "Outstanding",
+                  value: r.amountDue.toFixed(2),
+                  highlight: true,
+                },
+                {
+                  label: "Due",
+                  value: r.dueDate ? formatDateYmd(r.dueDate) : "—",
+                },
+              ]}
+            />
+            <MobileCardFooter>
+              <Button
+                type="button"
+                variant={r.amountDue > 0 ? "default" : "outline"}
+                size="sm"
+                className="h-9"
+                onClick={() => openPayment(r)}
+              >
+                {r.amountDue > 0 ? "Record payment" : "View"}
+              </Button>
+            </MobileCardFooter>
+          </MobileCardShell>
+        )}
       />
 
       <Sheet open={active !== null} onOpenChange={(open) => !open && setActive(null)}>

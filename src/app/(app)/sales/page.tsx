@@ -15,9 +15,19 @@ import {
 } from "@/components/receipts/payment-receipts";
 import { TransactionEditForm } from "@/components/transactions/transaction-edit-form";
 import { Button, ButtonLink } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/ui/data-table";
+import {
+  MobileCardFooter,
+  MobileCardHeader,
+  MobileCardMetrics,
+  MobileCardShell,
+} from "@/components/ui/mobile-card";
+import {
+  ListPageHeader,
+  MobileFilterPanel,
+  MobileSearchField,
+} from "@/components/ui/mobile-list-toolbar";
 import { cn } from "@/lib/utils";
 import {
   formatAppointmentSlot,
@@ -164,55 +174,102 @@ export default function SalesLedgerPage() {
     );
   }
 
-  return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-semibold">Sales & bookings</h2>
-        <p className="text-muted-foreground">
-          Every product sale and service booking in one place for{" "}
-          <span className="font-medium text-foreground">
-            {selectedBusiness?.name}
-          </span>
-          . Reports still offer period analytics — this is your day-to-day ledger.
-        </p>
-      </div>
+  function statusBadge(row: TransactionListItem) {
+    if (row.kind === "BOOKING" && row.status) {
+      return (
+        <Badge variant={bookingStatusVariant(row.status)}>
+          {STATUS_LABELS[row.status]}
+        </Badge>
+      );
+    }
+    if (row.saleType === "CREDIT" && row.creditStatus) {
+      return (
+        <Badge variant={row.creditStatus === "PAID" ? "secondary" : "outline"}>
+          {row.creditStatus === "PAID"
+            ? "Settled"
+            : row.creditStatus === "PARTIAL"
+              ? "Partial"
+              : "Outstanding"}
+        </Badge>
+      );
+    }
+    return <Badge variant="secondary">Paid</Badge>;
+  }
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap gap-2">
-          {kindTabs.map((tab) => (
-            <Button
-              key={tab.id}
-              variant={kind === tab.id ? "default" : "outline"}
-              size="sm"
-              onClick={() => setKind(tab.id)}
-            >
-              {tab.label}
-            </Button>
-          ))}
+  function mobileWhenLabel(row: TransactionListItem): string {
+    if (row.kind === "BOOKING" && row.startAt && row.endAt) {
+      const { date, timeRange } = formatAppointmentSlot(row.startAt, row.endAt);
+      return `${date} · ${timeRange}`;
+    }
+    const { date, time } = formatSaleTimestamp(row.occurredAt);
+    return `${date} · ${time}`;
+  }
+
+  return (
+    <div className="space-y-4 sm:space-y-6">
+      <ListPageHeader
+        title="Sales & bookings"
+        descriptionMobile={`Ledger for ${selectedBusiness?.name ?? "this business"}.`}
+        description={
+          <>
+            Every product sale and service booking in one place for{" "}
+            <span className="font-medium text-foreground">
+              {selectedBusiness?.name}
+            </span>
+            . Reports still offer period analytics — this is your day-to-day ledger.
+          </>
+        }
+      />
+
+      <MobileFilterPanel>
+        <div className="flex flex-col gap-3">
+          {kindTabs.length > 1 && (
+            <div className="grid grid-cols-3 gap-1 rounded-lg bg-muted p-1">
+              {kindTabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setKind(tab.id)}
+                  className={cn(
+                    "cursor-pointer rounded-md px-2 py-2 text-xs font-medium transition-colors sm:text-sm",
+                    kind === tab.id
+                      ? "bg-card text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          )}
+          <MobileSearchField
+            id="sales-search"
+            placeholder="Search customer, invoice, service…"
+            value={search}
+            onChange={setSearch}
+            onPageReset={() => setPage(1)}
+          />
         </div>
-        <Input
-          placeholder="Search customer, invoice, service…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="max-w-sm"
-        />
-      </div>
+      </MobileFilterPanel>
 
       <DataTable
         columns={[
           {
             id: "when",
             header: "When",
+            hideOnMobile: true,
             cell: (row) => whenCell(row),
           },
           {
             id: "type",
             header: "Type",
+            hideOnMobile: true,
             cell: (row) => kindBadge(row),
           },
           {
             id: "reference",
             header: "Reference",
+            mobilePrimary: true,
             cell: (row) => (
               <div>
                 <div
@@ -230,6 +287,7 @@ export default function SalesLedgerPage() {
           {
             id: "customer",
             header: "Customer",
+            hideOnMobile: true,
             cell: (row) => (
               <div>
                 {row.clientId ? (
@@ -253,6 +311,7 @@ export default function SalesLedgerPage() {
           {
             id: "payment",
             header: "Payment",
+            hideOnMobile: true,
             cell: (row) => (
               <span className="text-sm text-muted-foreground">
                 {paymentLabel(row)}
@@ -262,6 +321,7 @@ export default function SalesLedgerPage() {
           {
             id: "amount",
             header: "Amount",
+            hideOnMobile: true,
             headerClassName: "text-right",
             className: "text-right font-mono font-semibold",
             cell: (row) => money(row.amount),
@@ -269,6 +329,7 @@ export default function SalesLedgerPage() {
           {
             id: "receipt",
             header: "Receipt",
+            hideOnMobile: true,
             cell: (row) => (
               <TransactionReceiptCell
                 kind={row.kind}
@@ -280,35 +341,13 @@ export default function SalesLedgerPage() {
           {
             id: "status",
             header: "Status",
-            cell: (row) => {
-              if (row.kind === "BOOKING" && row.status) {
-                return (
-                  <Badge variant={bookingStatusVariant(row.status)}>
-                    {STATUS_LABELS[row.status]}
-                  </Badge>
-                );
-              }
-              if (row.saleType === "CREDIT" && row.creditStatus) {
-                return (
-                  <Badge
-                    variant={
-                      row.creditStatus === "PAID" ? "secondary" : "outline"
-                    }
-                  >
-                    {row.creditStatus === "PAID"
-                      ? "Settled"
-                      : row.creditStatus === "PARTIAL"
-                        ? "Partial"
-                        : "Outstanding"}
-                  </Badge>
-                );
-              }
-              return <Badge variant="secondary">Paid</Badge>;
-            },
+            hideOnMobile: true,
+            cell: (row) => statusBadge(row),
           },
           {
             id: "actions",
             header: "",
+            mobileActions: true,
             headerClassName: "text-right",
             className: "text-right",
             cell: (row) => (
@@ -349,6 +388,65 @@ export default function SalesLedgerPage() {
         }
         meta={meta}
         onPageChange={setPage}
+        renderMobileCard={(row) => (
+          <MobileCardShell>
+            <MobileCardHeader
+              title={row.reference}
+              subtitle={
+                <>
+                  {mobileWhenLabel(row)}
+                  {" · "}
+                  {row.customerName}
+                </>
+              }
+              badge={
+                <div className="flex flex-col items-end gap-1">
+                  {kindBadge(row)}
+                  {statusBadge(row)}
+                </div>
+              }
+            />
+            <MobileCardMetrics
+              items={[
+                {
+                  label: "Amount",
+                  value: money(row.amount),
+                  highlight: true,
+                },
+                {
+                  label: "Payment",
+                  value: paymentLabel(row),
+                },
+              ]}
+            />
+            <MobileCardFooter>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-9"
+                onClick={() => {
+                  setEditing(false);
+                  setActive(row);
+                }}
+              >
+                View
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-9"
+                onClick={() => {
+                  setEditing(true);
+                  setActive(row);
+                }}
+              >
+                Edit
+              </Button>
+            </MobileCardFooter>
+          </MobileCardShell>
+        )}
       />
 
       <Sheet

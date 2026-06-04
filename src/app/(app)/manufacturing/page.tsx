@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Hammer, Plus, CheckCircle2, AlertCircle } from "lucide-react";
+import { Plus, CheckCircle2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useBusiness } from "@/lib/business-context";
 import { hasFeature } from "@/domain/capabilities";
@@ -18,6 +18,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/ui/data-table";
+import {
+  MobileCardBody,
+  MobileCardHeader,
+  MobileCardMetrics,
+  MobileCardShell,
+} from "@/components/ui/mobile-card";
+import {
+  ListPageHeader,
+  MobileFilterPanel,
+  MobileSearchField,
+} from "@/components/ui/mobile-list-toolbar";
 import { cn } from "@/lib/utils";
 import {
   Sheet,
@@ -256,12 +267,14 @@ export default function ManufacturingPage() {
         id: "createdAt",
         header: "Date",
         sortKey: "createdAt",
+        hideOnMobile: true,
         cell: (r: ProductionRun) => formatDateTimeYmd(r.createdAt),
       },
       {
         id: "product",
         header: "Finished product",
         sortKey: "finishedProductName",
+        mobilePrimary: true,
         cell: (r: ProductionRun) => (
           <span className="font-medium">{r.finishedProductName}</span>
         ),
@@ -269,6 +282,7 @@ export default function ManufacturingPage() {
       {
         id: "qty",
         header: "Qty produced",
+        hideOnMobile: true,
         headerClassName: "text-right",
         className: "text-right font-mono",
         cell: (r: ProductionRun) =>
@@ -277,6 +291,7 @@ export default function ManufacturingPage() {
       {
         id: "cost",
         header: "Material cost",
+        hideOnMobile: true,
         headerClassName: "text-right",
         className: "text-right font-mono",
         cell: (r: ProductionRun) =>
@@ -285,6 +300,7 @@ export default function ManufacturingPage() {
       {
         id: "unitCost",
         header: "Cost / unit",
+        hideOnMobile: true,
         headerClassName: "text-right",
         className: "text-right font-mono text-muted-foreground",
         cell: (r: ProductionRun) =>
@@ -293,6 +309,7 @@ export default function ManufacturingPage() {
       {
         id: "recipe",
         header: "Raw materials used",
+        hideOnMobile: true,
         cell: (r: ProductionRun) => {
           const lines =
             r.materialsSnapshot && r.materialsSnapshot.length > 0
@@ -327,6 +344,7 @@ export default function ManufacturingPage() {
       {
         id: "notes",
         header: "Notes",
+        hideOnMobile: true,
         cell: (r: ProductionRun) => r.notes ?? "—",
       },
     ],
@@ -363,47 +381,47 @@ export default function ManufacturingPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h2 className="flex items-center gap-2 text-2xl font-semibold">
-            <Hammer className="size-6 text-primary" />
-            Manufacturing
-          </h2>
-          <p className="text-muted-foreground">
+    <div className="space-y-4 sm:space-y-6">
+      <ListPageHeader
+        title="Manufacturing"
+        descriptionMobile={`Production runs for ${selectedBusiness?.name ?? "this business"}.`}
+        description={
+          <>
             Record production runs for{" "}
             <span className="font-medium text-foreground">
               {selectedBusiness?.name}
             </span>
             . Raw materials are deducted and finished goods are added to stock.
-          </p>
-        </div>
-        <Button onClick={openRun} disabled={finishedProducts.length === 0}>
-          <Plus className="size-4" />
-          New production run
-        </Button>
-      </div>
+          </>
+        }
+        actions={
+          <Button
+            className="col-span-2 sm:col-span-1"
+            onClick={openRun}
+            disabled={finishedProducts.length === 0}
+          >
+            <Plus className="size-4" />
+            New run
+          </Button>
+        }
+      />
 
       {finishedProducts.length === 0 && (
-        <p className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+        <p className="rounded-2xl border border-dashed p-4 text-sm text-muted-foreground">
           Add <strong>finished products</strong> with a recipe on the Products
           page, and ensure raw materials are in stock via Purchases.
         </p>
       )}
 
-      <div className="flex max-w-sm gap-2">
-        <Input
+      <MobileFilterPanel>
+        <MobileSearchField
+          id="manufacturing-search"
           placeholder="Search production runs…"
           value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setPage(1);
-          }}
+          onChange={setSearch}
+          onPageReset={() => setPage(1)}
         />
-        <Button variant="outline" onClick={() => reload()}>
-          Search
-        </Button>
-      </div>
+      </MobileFilterPanel>
 
       <DataTable<ProductionRun>
         columns={columns}
@@ -419,6 +437,56 @@ export default function ManufacturingPage() {
           setDir(nextDir);
         }}
         emptyMessage="No production runs yet."
+        renderMobileCard={(r) => {
+          const lines =
+            r.materialsSnapshot && r.materialsSnapshot.length > 0
+              ? r.materialsSnapshot.map((line) => ({
+                  name: line.rawProductName ?? "Material",
+                  qty: line.quantityConsumed,
+                  unitId: line.rawUnitId,
+                }))
+              : r.recipeSnapshot.map((line) => ({
+                  name: line.rawProductName ?? "Material",
+                  qty: line.quantityPerUnit * r.quantityProduced,
+                  unitId: line.rawUnitId,
+                }));
+          return (
+            <MobileCardShell>
+              <MobileCardHeader
+                title={r.finishedProductName}
+                subtitle={formatDateTimeYmd(r.createdAt)}
+              />
+              <MobileCardMetrics
+                items={[
+                  {
+                    label: "Produced",
+                    value: formatQuantityWithUnit(
+                      r.quantityProduced,
+                      r.finishedUnitId
+                    ),
+                    highlight: true,
+                  },
+                  {
+                    label: "Material cost",
+                    value:
+                      r.totalMaterialCost != null
+                        ? r.totalMaterialCost.toFixed(2)
+                        : "—",
+                  },
+                ]}
+              />
+              {lines.length > 0 && (
+                <MobileCardBody className="text-xs">
+                  {lines
+                    .map((line) =>
+                      `${line.name} × ${formatQuantityWithUnit(line.qty, line.unitId)}`
+                    )
+                    .join(", ")}
+                </MobileCardBody>
+              )}
+            </MobileCardShell>
+          );
+        }}
       />
 
       <Sheet open={open} onOpenChange={setOpen}>

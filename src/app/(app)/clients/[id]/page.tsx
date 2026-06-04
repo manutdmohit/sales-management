@@ -22,10 +22,18 @@ import type {
 import { ButtonLink } from "@/components/ui/button";
 import { formatDateTimeYmd, formatDateYmd } from "@/lib/format-datetime";
 import { ClientEmailButton } from "@/components/clients/client-email-sheet";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
+import {
+  MobileCardHeader,
+  MobileCardMetrics,
+  MobileCardShell,
+} from "@/components/ui/mobile-card";
+import {
+  MobileFilterPanel,
+  MobileSearchField,
+} from "@/components/ui/mobile-list-toolbar";
 import { ReceiptCell } from "@/components/receipts/payment-receipts";
 import { receiptsFromPayments } from "@/lib/receipt-display";
 import { cn } from "@/lib/utils";
@@ -134,7 +142,7 @@ export default function ClientProfilePage() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <ButtonLink href="/clients" variant="ghost" size="sm" className="-ml-2">
         <ArrowLeft className="size-4" />
         Back to clients
@@ -142,7 +150,7 @@ export default function ClientProfilePage() {
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className="text-2xl font-semibold tracking-tight">
+          <h2 className="text-xl font-semibold tracking-tight sm:text-2xl">
             {summary.name}
           </h2>
           <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm text-muted-foreground">
@@ -189,7 +197,7 @@ export default function ClientProfilePage() {
         />
       </div>
 
-      <div className="flex w-fit gap-1 rounded-lg bg-muted p-1">
+      <div className="flex w-full gap-1 overflow-x-auto rounded-lg bg-muted p-1 sm:w-fit">
         {tabs.map((t) => (
           <button
             key={t.id}
@@ -245,17 +253,21 @@ export default function ClientProfilePage() {
 
       {tab === "purchases" && (
         <div className="space-y-4">
-          <Input
-            placeholder="Search by invoice or product…"
-            value={purchaseSearch}
-            onChange={(e) => setPurchaseSearch(e.target.value)}
-            className="max-w-sm"
-          />
+          <MobileFilterPanel>
+            <MobileSearchField
+              id="client-purchase-search"
+              placeholder="Search invoice or product…"
+              value={purchaseSearch}
+              onChange={setPurchaseSearch}
+              onPageReset={() => purchases.setPage(1)}
+            />
+          </MobileFilterPanel>
           <DataTable
             columns={[
               {
                 id: "invoice",
                 header: "Invoice",
+                mobilePrimary: true,
                 cell: (p: ClientPurchaseRecord) => (
                   <span className="font-mono text-sm">{p.invoiceNumber}</span>
                 ),
@@ -263,12 +275,14 @@ export default function ClientProfilePage() {
               {
                 id: "date",
                 header: "Date",
+                hideOnMobile: true,
                 cell: (p: ClientPurchaseRecord) =>
                   formatDateTimeYmd(p.createdAt),
               },
               {
                 id: "items",
                 header: "Items",
+                hideOnMobile: true,
                 className: "max-w-sm whitespace-normal",
                 cell: (p: ClientPurchaseRecord) =>
                   p.items
@@ -278,6 +292,7 @@ export default function ClientProfilePage() {
               {
                 id: "type",
                 header: "Type",
+                hideOnMobile: true,
                 cell: (p: ClientPurchaseRecord) => (
                   <Badge
                     variant={p.saleType === "CREDIT" ? "outline" : "secondary"}
@@ -289,6 +304,7 @@ export default function ClientProfilePage() {
               {
                 id: "due",
                 header: "Outstanding",
+                hideOnMobile: true,
                 headerClassName: "text-right",
                 className: "text-right font-mono",
                 cell: (p: ClientPurchaseRecord) =>
@@ -301,6 +317,7 @@ export default function ClientProfilePage() {
               {
                 id: "total",
                 header: "Total",
+                hideOnMobile: true,
                 headerClassName: "text-right",
                 className: "text-right font-mono font-semibold",
                 cell: (p: ClientPurchaseRecord) => money(p.total),
@@ -308,6 +325,7 @@ export default function ClientProfilePage() {
               {
                 id: "receipt",
                 header: "Receipt",
+                hideOnMobile: true,
                 cell: (p: ClientPurchaseRecord) => (
                   <ReceiptCell receipt={receiptsFromPayments(p.payments)[0]} />
                 ),
@@ -319,6 +337,34 @@ export default function ClientProfilePage() {
             meta={purchases.meta}
             onPageChange={purchases.setPage}
             emptyMessage="No purchases match."
+            renderMobileCard={(p) => (
+              <MobileCardShell>
+                <MobileCardHeader
+                  title={p.invoiceNumber}
+                  subtitle={formatDateTimeYmd(p.createdAt)}
+                  badge={
+                    <Badge
+                      variant={p.saleType === "CREDIT" ? "outline" : "secondary"}
+                    >
+                      {p.saleType === "CREDIT" ? "Credit" : "Paid"}
+                    </Badge>
+                  }
+                />
+                <MobileCardMetrics
+                  items={[
+                    {
+                      label: "Total",
+                      value: money(p.total),
+                      highlight: true,
+                    },
+                    {
+                      label: "Due",
+                      value: p.amountDue > 0 ? money(p.amountDue) : "—",
+                    },
+                  ]}
+                />
+              </MobileCardShell>
+            )}
           />
         </div>
       )}
@@ -329,17 +375,20 @@ export default function ClientProfilePage() {
             {
               id: "service",
               header: "Service",
+              mobilePrimary: true,
               cell: (b: ClientServiceRecord) => b.serviceName,
             },
             {
               id: "when",
               header: "When",
+              hideOnMobile: true,
               cell: (b: ClientServiceRecord) =>
                 formatDateTimeYmd(b.startAt),
             },
             {
               id: "status",
               header: "Status",
+              hideOnMobile: true,
               cell: (b: ClientServiceRecord) => (
                 <Badge variant={statusVariant(b.status)}>{b.status}</Badge>
               ),
@@ -347,6 +396,7 @@ export default function ClientProfilePage() {
             {
               id: "price",
               header: "Price",
+              hideOnMobile: true,
               headerClassName: "text-right",
               className: "text-right font-mono font-semibold",
               cell: (b: ClientServiceRecord) => money(b.price),
@@ -354,6 +404,7 @@ export default function ClientProfilePage() {
             {
               id: "receipt",
               header: "Receipt",
+              hideOnMobile: true,
               cell: (b: ClientServiceRecord) => (
                 <ReceiptCell receipt={b.paymentReceipt} />
               ),
@@ -365,6 +416,24 @@ export default function ClientProfilePage() {
           meta={bookings.meta}
           onPageChange={bookings.setPage}
           emptyMessage="No bookings yet."
+          renderMobileCard={(b) => (
+            <MobileCardShell>
+              <MobileCardHeader
+                title={b.serviceName}
+                subtitle={formatDateTimeYmd(b.startAt)}
+                badge={<Badge variant={statusVariant(b.status)}>{b.status}</Badge>}
+              />
+              <MobileCardMetrics
+                items={[
+                  {
+                    label: "Price",
+                    value: money(b.price),
+                    highlight: true,
+                  },
+                ]}
+              />
+            </MobileCardShell>
+          )}
         />
       )}
     </div>

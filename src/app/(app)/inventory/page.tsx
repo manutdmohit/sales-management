@@ -16,6 +16,17 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
+import {
+  MobileCardFooter,
+  MobileCardHeader,
+  MobileCardMetrics,
+  MobileCardShell,
+} from "@/components/ui/mobile-card";
+import {
+  ListPageHeader,
+  MobileFilterPanel,
+  MobileSearchField,
+} from "@/components/ui/mobile-list-toolbar";
 import { formatDateYmd } from "@/lib/format-datetime";
 import { useConfirm } from "@/components/ui/confirm-provider";
 import {
@@ -231,44 +242,53 @@ export default function InventoryPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-semibold">Inventory</h2>
-          <p className="text-muted-foreground">
+    <div className="space-y-4 sm:space-y-6">
+      <ListPageHeader
+        title="Inventory"
+        descriptionMobile="Ledger stock — receive on Purchases or adjust below."
+        description={
+          <>
             Stock is calculated from the ledger. Use{" "}
             <strong className="font-medium text-foreground">Receive stock</strong>{" "}
             on Purchases to add quantity, or adjust manually below.
-          </p>
-        </div>
-        <ButtonLink href="/purchases" variant="outline">
-          <PackagePlus className="size-4" />
-          Receive stock
-        </ButtonLink>
-      </div>
-
-      <Input
-        placeholder="Search products (name or SKU)…"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="max-w-sm"
+          </>
+        }
+        actions={
+          <ButtonLink href="/purchases" variant="outline">
+            <PackagePlus className="size-4" />
+            Receive stock
+          </ButtonLink>
+        }
       />
 
-      {isManufacturer && (
-        <div className="flex flex-wrap gap-2">
-          {KIND_FILTERS.map((f) => (
-            <Button
-              key={f.id}
-              type="button"
-              variant={kindFilter === f.id ? "default" : "outline"}
-              size="sm"
-              onClick={() => setKindFilter(f.id)}
-            >
-              {f.label}
-            </Button>
-          ))}
-        </div>
-      )}
+      <MobileFilterPanel className="space-y-3">
+        <MobileSearchField
+          id="inventory-search"
+          placeholder="Search name or SKU…"
+          value={search}
+          onChange={setSearch}
+          onPageReset={() => setPage(1)}
+        />
+        {isManufacturer && (
+          <div className="flex flex-wrap gap-2">
+            {KIND_FILTERS.map((f) => (
+              <Button
+                key={f.id}
+                type="button"
+                variant={kindFilter === f.id ? "default" : "outline"}
+                size="sm"
+                className="min-h-9 touch-manipulation"
+                onClick={() => {
+                  setKindFilter(f.id);
+                  setPage(1);
+                }}
+              >
+                {f.label}
+              </Button>
+            ))}
+          </div>
+        )}
+      </MobileFilterPanel>
 
       {(expiryLoading || expiryAlerts.length > 0) && (
         <Card className="border-chart-3/30">
@@ -345,12 +365,14 @@ export default function InventoryPage() {
             id: "product",
             header: "Product",
             sortKey: "name",
+            mobilePrimary: true,
             cell: (r) => r.productName,
           },
           {
             id: "sku",
             header: "SKU",
             sortKey: "sku",
+            hideOnMobile: true,
             cell: (r) => (
               <span className="font-mono text-muted-foreground">{r.sku}</span>
             ),
@@ -360,6 +382,7 @@ export default function InventoryPage() {
                 {
                   id: "kind",
                   header: "Kind",
+                  hideOnMobile: true,
                   cell: (r: StockSummary) => (
                     <Badge
                       variant={r.productKind === "RAW" ? "secondary" : "default"}
@@ -373,6 +396,7 @@ export default function InventoryPage() {
           {
             id: "stock",
             header: "Stock",
+            hideOnMobile: true,
             headerClassName: "text-right",
             className: "text-right font-mono",
             cell: (r) => formatQuantityWithUnit(r.stock, r.unitId),
@@ -381,6 +405,7 @@ export default function InventoryPage() {
             id: "min",
             header: "Min",
             sortKey: "minStock",
+            hideOnMobile: true,
             headerClassName: "text-right",
             className: "text-right",
             cell: (r) => formatQuantityWithUnit(r.minStock, r.unitId),
@@ -388,6 +413,7 @@ export default function InventoryPage() {
           {
             id: "status",
             header: "Status",
+            hideOnMobile: true,
             cell: (r) =>
               r.isLowStock ? (
                 <Badge variant="destructive">Low stock</Badge>
@@ -398,6 +424,7 @@ export default function InventoryPage() {
           {
             id: "actions",
             header: "Actions",
+            mobileActions: true,
             headerClassName: "text-right",
             className: "text-right",
             cell: (r) => (
@@ -417,6 +444,48 @@ export default function InventoryPage() {
         sort={sort}
         dir={dir}
         onSortChange={handleSort}
+        renderMobileCard={(r) => (
+          <MobileCardShell>
+            <MobileCardHeader
+              title={r.productName}
+              subtitle={[r.sku, isManufacturer && r.productKind === "RAW" ? "Raw" : isManufacturer ? "Finished" : null]
+                .filter(Boolean)
+                .join(" · ")}
+              badge={
+                r.isLowStock ? (
+                  <Badge variant="destructive">Low</Badge>
+                ) : (
+                  <Badge variant="secondary">OK</Badge>
+                )
+              }
+            />
+            <MobileCardMetrics
+              items={[
+                {
+                  label: "On hand",
+                  value: formatQuantityWithUnit(r.stock, r.unitId),
+                  highlight: true,
+                },
+                {
+                  label: "Min stock",
+                  value: formatQuantityWithUnit(r.minStock, r.unitId),
+                },
+              ]}
+            />
+            <MobileCardFooter>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-9 touch-manipulation"
+                onClick={() => openAdjust(r)}
+              >
+                <SlidersHorizontal className="size-3.5" />
+                Adjust
+              </Button>
+            </MobileCardFooter>
+          </MobileCardShell>
+        )}
       />
 
       <Sheet open={adjustOpen} onOpenChange={setAdjustOpen}>

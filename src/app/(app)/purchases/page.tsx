@@ -21,6 +21,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DataTable } from "@/components/ui/data-table";
 import {
+  MobileCardBody,
+  MobileCardFooter,
+  MobileCardHeader,
+  MobileCardMetrics,
+  MobileCardShell,
+} from "@/components/ui/mobile-card";
+import {
+  ListPageHeader,
+  MobileFilterPanel,
+  MobileSearchField,
+} from "@/components/ui/mobile-list-toolbar";
+import {
   Sheet,
   SheetContent,
   SheetDescription,
@@ -350,35 +362,41 @@ export default function PurchasesPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-semibold">Purchases</h2>
-          <p className="text-muted-foreground">
+    <div className="space-y-4 sm:space-y-6">
+      <ListPageHeader
+        title="Purchases"
+        descriptionMobile={`Stock receipts for ${selectedBusiness?.name ?? "this business"}.`}
+        description={
+          <>
             Receive stock for{" "}
             <span className="font-medium text-foreground">
               {selectedBusiness?.name}
             </span>
             . Each purchase adds inventory (stock in) before POS can sell.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <ButtonLink href="/suppliers" variant="outline">
-            Manage suppliers
-          </ButtonLink>
-          <Button onClick={openReceive} disabled={productsLoading}>
-            <Plus className="size-4" />
-            Receive stock
-          </Button>
-        </div>
-      </div>
-
-      <Input
-        placeholder="Search by supplier or reference…"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="max-w-sm"
+          </>
+        }
+        actions={
+          <>
+            <ButtonLink href="/suppliers" variant="outline">
+              Suppliers
+            </ButtonLink>
+            <Button onClick={openReceive} disabled={productsLoading}>
+              <Plus className="size-4" />
+              Receive stock
+            </Button>
+          </>
+        }
       />
+
+      <MobileFilterPanel>
+        <MobileSearchField
+          id="purchase-search"
+          placeholder="Search supplier or reference…"
+          value={search}
+          onChange={setSearch}
+          onPageReset={() => setPurchasePage(1)}
+        />
+      </MobileFilterPanel>
 
       <DataTable
         columns={[
@@ -386,12 +404,14 @@ export default function PurchasesPage() {
             id: "date",
             header: "Date",
             sortKey: "createdAt",
+            hideOnMobile: true,
             cell: (p) => formatDateYmd(p.createdAt),
           },
           {
             id: "supplier",
             header: "Supplier",
             sortKey: "supplierName",
+            mobilePrimary: true,
             cell: (p) =>
               p.supplierId ? (
                 <Link
@@ -407,6 +427,7 @@ export default function PurchasesPage() {
           {
             id: "items",
             header: "Items",
+            hideOnMobile: true,
             cell: (p) => p.items.map((i) => purchaseItemLabel(i)).join(", "),
             className: "max-w-md whitespace-normal",
           },
@@ -414,6 +435,7 @@ export default function PurchasesPage() {
             id: "total",
             header: "Total",
             sortKey: "total",
+            hideOnMobile: true,
             headerClassName: "text-right",
             className: "text-right font-mono",
             cell: (p) => p.total.toFixed(2),
@@ -421,6 +443,7 @@ export default function PurchasesPage() {
           {
             id: "receipt",
             header: "Receipt",
+            hideOnMobile: true,
             cell: (p) =>
               p.receipts?.[0] ? (
                 <ReceiptThumb receipt={p.receipts[0]} />
@@ -431,6 +454,7 @@ export default function PurchasesPage() {
           {
             id: "actions",
             header: "",
+            mobileActions: true,
             headerClassName: "text-right",
             className: "text-right",
             cell: (p) => (
@@ -449,6 +473,49 @@ export default function PurchasesPage() {
         sort={sort}
         dir={dir}
         onSortChange={handleSort}
+        renderMobileCard={(p) => (
+          <MobileCardShell>
+            <MobileCardHeader
+              title={
+                p.supplierId ? (
+                  <Link
+                    href={`/suppliers/${p.supplierId}`}
+                    className="hover:text-primary"
+                  >
+                    {p.supplierName}
+                  </Link>
+                ) : (
+                  p.supplierName
+                )
+              }
+              subtitle={formatDateYmd(p.createdAt)}
+            />
+            <MobileCardBody className="line-clamp-2 text-xs">
+              {p.items.map((i) => purchaseItemLabel(i)).join(", ")}
+            </MobileCardBody>
+            <MobileCardMetrics
+              items={[
+                {
+                  label: "Total",
+                  value: p.total.toFixed(2),
+                  highlight: true,
+                },
+              ]}
+            />
+            <MobileCardFooter>
+              {p.receipts?.[0] && <ReceiptThumb receipt={p.receipts[0]} />}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-9"
+                onClick={() => openEdit(p)}
+              >
+                Edit
+              </Button>
+            </MobileCardFooter>
+          </MobileCardShell>
+        )}
       />
 
       <Sheet

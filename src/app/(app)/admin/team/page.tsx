@@ -22,6 +22,16 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/ui/data-table";
 import {
+  MobileCardFooter,
+  MobileCardHeader,
+  MobileCardShell,
+} from "@/components/ui/mobile-card";
+import {
+  ListPageHeader,
+  MobileFilterPanel,
+  MobileSearchField,
+} from "@/components/ui/mobile-list-toolbar";
+import {
   Sheet,
   SheetContent,
   SheetDescription,
@@ -210,33 +220,35 @@ export default function AdminTeamPage() {
   ];
 
   return (
-    <div className="animate-in fade-in slide-in-from-bottom-2 space-y-6 duration-500">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h3 className="text-lg font-semibold">Team members</h3>
-          <p className="text-sm text-muted-foreground">
-            Add staff, set their password and role, and deactivate access when
-            someone leaves.
-          </p>
-        </div>
-        <Button onClick={openCreate}>
-          <Plus className="size-4" />
-          Add member
-        </Button>
-      </div>
+    <div className="animate-in fade-in slide-in-from-bottom-2 space-y-4 duration-500 sm:space-y-6">
+      <ListPageHeader
+        title="Team members"
+        descriptionMobile="Manage staff access and roles."
+        description="Add staff, set their password and role, and deactivate access when someone leaves."
+        actions={
+          <Button className="col-span-2 sm:col-span-1" onClick={openCreate}>
+            <Plus className="size-4" />
+            Add member
+          </Button>
+        }
+      />
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-3 sm:gap-4">
         {statCards.map(({ label, value, icon: Icon, tint }) => (
           <div
             key={label}
-            className="card-elevated card-hover flex items-center justify-between rounded-xl bg-card p-4"
+            className="card-elevated card-hover flex items-center justify-between rounded-2xl bg-card p-4"
           >
             <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">{label}</p>
-              <p className="text-2xl font-semibold tabular-nums">{value}</p>
+              <p className="text-xs font-medium text-muted-foreground sm:text-sm">
+                {label}
+              </p>
+              <p className="text-xl font-semibold tabular-nums sm:text-2xl">
+                {value}
+              </p>
             </div>
             <div
-              className={`flex size-11 items-center justify-center rounded-xl ${tint}`}
+              className={`flex size-10 items-center justify-center rounded-xl sm:size-11 ${tint}`}
             >
               <Icon className="size-5" />
             </div>
@@ -244,19 +256,22 @@ export default function AdminTeamPage() {
         ))}
       </div>
 
-      <div className="max-w-sm">
-        <Input
+      <MobileFilterPanel>
+        <MobileSearchField
+          id="team-search"
           placeholder="Search name or email…"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={setSearch}
+          onPageReset={() => setPage(1)}
         />
-      </div>
+      </MobileFilterPanel>
 
       <DataTable
         columns={[
           {
             id: "name",
             header: "Name",
+            mobilePrimary: true,
             cell: (m: TeamMember) => (
               <div className="flex flex-col">
                 <span className="font-medium">{m.name}</span>
@@ -269,6 +284,7 @@ export default function AdminTeamPage() {
           {
             id: "email",
             header: "Email",
+            hideOnMobile: true,
             cell: (m: TeamMember) => (
               <span className="text-sm">{m.email}</span>
             ),
@@ -276,6 +292,7 @@ export default function AdminTeamPage() {
           {
             id: "role",
             header: "Role",
+            hideOnMobile: true,
             cell: (m: TeamMember) => (
               <Badge variant={m.role === "ADMIN" ? "secondary" : "outline"}>
                 {ROLE_LABELS[m.role]}
@@ -285,6 +302,7 @@ export default function AdminTeamPage() {
           {
             id: "status",
             header: "Status",
+            hideOnMobile: true,
             cell: (m: TeamMember) =>
               m.isActive ? (
                 <Badge variant="secondary">Active</Badge>
@@ -295,6 +313,7 @@ export default function AdminTeamPage() {
           {
             id: "actions",
             header: "Actions",
+            mobileActions: true,
             headerClassName: "text-right",
             className: "text-right",
             cell: (m: TeamMember) => (
@@ -332,6 +351,51 @@ export default function AdminTeamPage() {
         emptyMessage="No team members yet. Click Add member to create one."
         meta={meta}
         onPageChange={setPage}
+        renderMobileCard={(m) => (
+          <MobileCardShell>
+            <MobileCardHeader
+              title={m.name}
+              subtitle={m.email}
+              badge={
+                <div className="flex flex-col items-end gap-1">
+                  <Badge variant={m.role === "ADMIN" ? "secondary" : "outline"}>
+                    {ROLE_LABELS[m.role]}
+                  </Badge>
+                  <Badge variant={m.isActive ? "secondary" : "outline"}>
+                    {m.isActive ? "Active" : "Inactive"}
+                  </Badge>
+                </div>
+              }
+            />
+            <MobileCardFooter>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-9"
+                onClick={() => openEdit(m)}
+              >
+                <Pencil className="size-3.5" />
+                Edit
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-9"
+                onClick={() => toggleActive(m)}
+                disabled={user?._id === m._id}
+              >
+                {m.isActive ? (
+                  <PauseCircle className="size-3.5" />
+                ) : (
+                  <CheckCircle2 className="size-3.5" />
+                )}
+                {m.isActive ? "Deactivate" : "Activate"}
+              </Button>
+            </MobileCardFooter>
+          </MobileCardShell>
+        )}
       />
 
       <Sheet open={mode !== null} onOpenChange={(open) => !open && closeSheet()}>

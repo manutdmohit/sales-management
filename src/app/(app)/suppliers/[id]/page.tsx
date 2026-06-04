@@ -19,6 +19,11 @@ import { ButtonLink } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
+import {
+  MobileCardHeader,
+  MobileCardMetrics,
+  MobileCardShell,
+} from "@/components/ui/mobile-card";
 import { ReceiptCell } from "@/components/receipts/payment-receipts";
 
 function money(n: number): string {
@@ -88,7 +93,7 @@ export default function SupplierProfilePage() {
   const s = summary.stats;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <ButtonLink href="/suppliers" variant="ghost" size="sm" className="-ml-2">
         <ArrowLeft className="size-4" />
         Back to suppliers
@@ -97,7 +102,7 @@ export default function SupplierProfilePage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-2xl font-semibold tracking-tight">
+            <h2 className="text-xl font-semibold tracking-tight sm:text-2xl">
               {summary.name}
             </h2>
             {summary.isActive ? (
@@ -188,22 +193,26 @@ export default function SupplierProfilePage() {
             {
               id: "date",
               header: "Date",
+              hideOnMobile: true,
               cell: (p) => formatDateYmd(p.createdAt),
             },
             {
               id: "items",
               header: "Items",
+              mobilePrimary: true,
               cell: (p) => p.items.map((i) => purchaseItemLabel(i)).join(", "),
               className: "max-w-md whitespace-normal",
             },
             {
               id: "ref",
               header: "Reference",
+              hideOnMobile: true,
               cell: (p) => p.referenceNumber ?? "—",
             },
             {
               id: "total",
               header: "Total",
+              hideOnMobile: true,
               headerClassName: "text-right",
               className: "text-right font-mono",
               cell: (p) => p.total.toFixed(2),
@@ -211,6 +220,7 @@ export default function SupplierProfilePage() {
             {
               id: "receipt",
               header: "Receipt",
+              hideOnMobile: true,
               cell: (p) => <ReceiptCell receipt={p.receipts?.[0]} />,
             },
           ]}
@@ -220,6 +230,27 @@ export default function SupplierProfilePage() {
           emptyMessage="No purchases from this supplier yet."
           meta={purchases.meta}
           onPageChange={purchases.setPage}
+          renderMobileCard={(p) => (
+            <MobileCardShell>
+              <MobileCardHeader
+                title={formatDateYmd(p.createdAt)}
+                subtitle={p.referenceNumber ?? "No reference"}
+              />
+              <MobileCardMetrics
+                items={[
+                  {
+                    label: "Total",
+                    value: p.total.toFixed(2),
+                    highlight: true,
+                  },
+                  {
+                    label: "Items",
+                    value: p.items.length,
+                  },
+                ]}
+              />
+            </MobileCardShell>
+          )}
         />
       </section>
     </div>

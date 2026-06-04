@@ -15,6 +15,16 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/ui/data-table";
 import {
+  MobileCardFooter,
+  MobileCardHeader,
+  MobileCardShell,
+} from "@/components/ui/mobile-card";
+import {
+  ListPageHeader,
+  MobileFilterPanel,
+  MobileSearchField,
+} from "@/components/ui/mobile-list-toolbar";
+import {
   Sheet,
   SheetContent,
   SheetDescription,
@@ -177,26 +187,28 @@ export default function SuppliersPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-2xl font-semibold tracking-tight">Suppliers</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Vendor directory — contact details and purchase history per supplier.
-          </p>
-        </div>
-        <Button type="button" onClick={openCreate}>
-          <Plus className="size-4" />
-          Add supplier
-        </Button>
-      </div>
-
-      <Input
-        placeholder="Search name, contact, phone, email…"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="max-w-sm"
+    <div className="space-y-4 sm:space-y-6">
+      <ListPageHeader
+        title="Suppliers"
+        descriptionMobile="Vendor directory and purchase history."
+        description="Vendor directory — contact details and purchase history per supplier."
+        actions={
+          <Button type="button" className="col-span-2 sm:col-span-1" onClick={openCreate}>
+            <Plus className="size-4" />
+            Add supplier
+          </Button>
+        }
       />
+
+      <MobileFilterPanel>
+        <MobileSearchField
+          id="supplier-search"
+          placeholder="Search name, phone, or email…"
+          value={search}
+          onChange={setSearch}
+          onPageReset={() => setPage(1)}
+        />
+      </MobileFilterPanel>
 
       <DataTable
         columns={[
@@ -204,6 +216,7 @@ export default function SuppliersPage() {
             id: "name",
             header: "Name",
             sortKey: "name",
+            mobilePrimary: true,
             cell: (s: Supplier) => (
               <Link
                 href={`/suppliers/${s._id}`}
@@ -217,23 +230,27 @@ export default function SuppliersPage() {
             id: "contact",
             header: "Contact person",
             sortKey: "contactPerson",
+            hideOnMobile: true,
             cell: (s: Supplier) => s.contactPerson ?? "—",
           },
           {
             id: "phone",
             header: "Phone",
             sortKey: "phone",
+            hideOnMobile: true,
             cell: (s: Supplier) => s.phone ?? "—",
           },
           {
             id: "email",
             header: "Email",
             sortKey: "email",
+            hideOnMobile: true,
             cell: (s: Supplier) => s.email ?? "—",
           },
           {
             id: "status",
             header: "Status",
+            hideOnMobile: true,
             cell: (s: Supplier) =>
               s.isActive ? (
                 <Badge variant="secondary">Active</Badge>
@@ -244,6 +261,7 @@ export default function SuppliersPage() {
           {
             id: "actions",
             header: "",
+            mobileActions: true,
             headerClassName: "text-right",
             className: "text-right",
             cell: (s: Supplier) => (
@@ -287,6 +305,39 @@ export default function SuppliersPage() {
         dir={dir}
         onSortChange={handleSort}
         emptyMessage="No suppliers yet. Add one before receiving stock."
+        renderMobileCard={(s) => (
+          <MobileCardShell>
+            <MobileCardHeader
+              title={
+                <Link href={`/suppliers/${s._id}`} className="hover:text-primary">
+                  {s.name}
+                </Link>
+              }
+              subtitle={[s.contactPerson, s.phone, s.email].filter(Boolean).join(" · ")}
+              badge={
+                <Badge variant={s.isActive ? "secondary" : "outline"}>
+                  {s.isActive ? "Active" : "Inactive"}
+                </Badge>
+              }
+            />
+            <MobileCardFooter>
+              <ButtonLink href={`/suppliers/${s._id}`} variant="outline" size="sm" className="h-9">
+                <Eye className="size-3.5" />
+                View
+              </ButtonLink>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-9"
+                onClick={() => openEdit(s)}
+              >
+                <Pencil className="size-3.5" />
+                Edit
+              </Button>
+            </MobileCardFooter>
+          </MobileCardShell>
+        )}
       />
 
       <Sheet open={formOpen} onOpenChange={setFormOpen}>

@@ -33,6 +33,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/ui/data-table";
+import {
+  MobileCardFooter,
+  MobileCardHeader,
+  MobileCardMetrics,
+  MobileCardShell,
+} from "@/components/ui/mobile-card";
+import {
+  ListPageHeader,
+  MobileFilterPanel,
+  MobileSearchField,
+} from "@/components/ui/mobile-list-toolbar";
 import { cn } from "@/lib/utils";
 import {
   Sheet,
@@ -341,26 +352,33 @@ export default function AppointmentsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-semibold">Appointments</h2>
-          <p className="text-muted-foreground">
+    <div className="space-y-4 sm:space-y-6">
+      <ListPageHeader
+        title="Appointments"
+        descriptionMobile={`Service bookings for ${selectedBusiness?.name ?? "this business"}.`}
+        description={
+          <>
             Book services and track follow-ups for{" "}
             <span className="font-medium text-foreground">
               {selectedBusiness?.name}
             </span>
             .
-          </p>
-        </div>
-        <Button onClick={openBooking} disabled={services.length === 0}>
-          <CalendarPlus className="size-4" />
-          Book appointment
-        </Button>
-      </div>
+          </>
+        }
+        actions={
+          <Button
+            className="col-span-2 sm:col-span-1"
+            onClick={openBooking}
+            disabled={services.length === 0}
+          >
+            <CalendarPlus className="size-4" />
+            Book appointment
+          </Button>
+        }
+      />
 
       {services.length === 0 && (
-        <p className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+        <p className="rounded-2xl border border-dashed p-4 text-sm text-muted-foreground">
           Add a service first on the{" "}
           <ButtonLink href="/services" variant="link" className="px-1">
             Services
@@ -369,12 +387,15 @@ export default function AppointmentsPage() {
         </p>
       )}
 
-      <Input
-        placeholder="Search by customer, phone or service…"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="max-w-sm"
-      />
+      <MobileFilterPanel>
+        <MobileSearchField
+          id="appointment-search"
+          placeholder="Search customer, phone or service…"
+          value={search}
+          onChange={setSearch}
+          onPageReset={() => setPage(1)}
+        />
+      </MobileFilterPanel>
 
       <DataTable
         columns={[
@@ -382,6 +403,7 @@ export default function AppointmentsPage() {
             id: "when",
             header: "When",
             sortKey: "startAt",
+            hideOnMobile: true,
             cell: (a) => {
               const { date, timeRange } = formatAppointmentSlot(a.startAt, a.endAt);
               return (
@@ -396,12 +418,14 @@ export default function AppointmentsPage() {
             id: "service",
             header: "Service",
             sortKey: "serviceName",
+            mobilePrimary: true,
             cell: (a) => <span className="font-medium">{a.serviceName}</span>,
           },
           {
             id: "customer",
             header: "Customer",
             sortKey: "customerName",
+            hideOnMobile: true,
             cell: (a) => (
               <div>
                 <div>{a.customerName}</div>
@@ -415,6 +439,7 @@ export default function AppointmentsPage() {
           {
             id: "followup",
             header: "Follow-up",
+            hideOnMobile: true,
             cell: (a) =>
               a.followUpAt
                 ? formatDateYmd(a.followUpAt)
@@ -424,6 +449,7 @@ export default function AppointmentsPage() {
             id: "price",
             header: "Price",
             sortKey: "price",
+            hideOnMobile: true,
             headerClassName: "text-right",
             className: "text-right font-mono",
             cell: (a) => a.price.toFixed(2),
@@ -431,6 +457,7 @@ export default function AppointmentsPage() {
           {
             id: "receipt",
             header: "Receipt",
+            hideOnMobile: true,
             cell: (a) => {
               const receipt =
                 resolveAppointmentPayments(a).find((p) => p.receipt)?.receipt ??
@@ -446,6 +473,7 @@ export default function AppointmentsPage() {
             id: "status",
             header: "Status",
             sortKey: "status",
+            hideOnMobile: true,
             cell: (a) => (
               <Badge variant={statusVariant(a.status)}>
                 {STATUS_LABELS[a.status]}
@@ -455,6 +483,7 @@ export default function AppointmentsPage() {
           {
             id: "actions",
             header: "Actions",
+            mobileActions: true,
             headerClassName: "text-right",
             className: "text-right",
             cell: (a) => (
@@ -512,6 +541,66 @@ export default function AppointmentsPage() {
         sort={sort}
         dir={dir}
         onSortChange={handleSort}
+        renderMobileCard={(a) => {
+          const { date, timeRange } = formatAppointmentSlot(a.startAt, a.endAt);
+          return (
+            <MobileCardShell>
+              <MobileCardHeader
+                title={a.serviceName}
+                subtitle={`${date} · ${timeRange}`}
+                badge={
+                  <Badge variant={statusVariant(a.status)}>
+                    {STATUS_LABELS[a.status]}
+                  </Badge>
+                }
+              />
+              <MobileCardMetrics
+                items={[
+                  {
+                    label: "Customer",
+                    value: a.customerName,
+                  },
+                  {
+                    label: "Price",
+                    value: a.price.toFixed(2),
+                    highlight: true,
+                  },
+                ]}
+              />
+              <MobileCardFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-9"
+                  onClick={() => openView(a)}
+                >
+                  View
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-9"
+                  onClick={() => openEdit(a)}
+                >
+                  Edit
+                </Button>
+                {a.status === "BOOKED" && (
+                  <Button
+                    type="button"
+                    variant="default"
+                    size="sm"
+                    className="h-9"
+                    onClick={() => setStatus(a, "COMPLETED")}
+                  >
+                    Complete
+                  </Button>
+                )}
+              </MobileCardFooter>
+            </MobileCardShell>
+          );
+        }}
       />
 
       <Sheet open={bookOpen} onOpenChange={setBookOpen}>

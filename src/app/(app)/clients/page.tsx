@@ -15,6 +15,20 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DataTable } from "@/components/ui/data-table";
 import {
+  MobileCardBody,
+  MobileCardDetail,
+  MobileCardDetails,
+  MobileCardFooter,
+  MobileCardHeader,
+  MobileCardMetrics,
+  MobileCardShell,
+} from "@/components/ui/mobile-card";
+import {
+  ListPageHeader,
+  MobileFilterPanel,
+  MobileSearchField,
+} from "@/components/ui/mobile-list-toolbar";
+import {
   Sheet,
   SheetContent,
   SheetDescription,
@@ -153,28 +167,33 @@ export default function ClientsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-2xl font-semibold tracking-tight">Clients</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
+    <div className="space-y-4 sm:space-y-6">
+      <ListPageHeader
+        title="Clients"
+        descriptionMobile="Customer database — tap a client for purchases and bookings."
+        description={
+          <>
             Customer database — open a client to see their purchases
             {servicesEnabled ? " and bookings" : ""}.
-          </p>
-        </div>
-        <Button type="button" onClick={openCreate}>
-          <Plus className="size-4" />
-          Add client
-        </Button>
-      </div>
+          </>
+        }
+        actions={
+          <Button type="button" className="col-span-2 sm:col-span-1" onClick={openCreate}>
+            <Plus className="size-4" />
+            Add client
+          </Button>
+        }
+      />
 
-      <div className="max-w-sm w-full sm:max-w-sm">
-        <Input
-          placeholder="Search name, phone, email, address…"
+      <MobileFilterPanel>
+        <MobileSearchField
+          id="client-search"
+          placeholder="Search name, phone, or email…"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={setSearch}
+          onPageReset={() => setPage(1)}
         />
-      </div>
+      </MobileFilterPanel>
 
       <DataTable
         columns={[
@@ -182,6 +201,7 @@ export default function ClientsPage() {
             id: "name",
             header: "Name",
             sortKey: "name",
+            mobilePrimary: true,
             cell: (c: Client) => (
               <Link
                 href={`/clients/${c._id}`}
@@ -195,22 +215,26 @@ export default function ClientsPage() {
             id: "phone",
             header: "Contact",
             sortKey: "phone",
+            hideOnMobile: true,
             cell: (c: Client) => c.phone,
           },
           {
             id: "email",
             header: "Email",
             sortKey: "email",
+            hideOnMobile: true,
             cell: (c: Client) => c.email ?? "—",
           },
           {
             id: "address",
             header: "Address",
+            hideOnMobile: true,
             cell: (c: Client) => c.address ?? "—",
           },
           {
             id: "actions",
             header: "",
+            mobileActions: true,
             headerClassName: "text-right",
             className: "text-right",
             cell: (c: Client) => (
@@ -246,6 +270,40 @@ export default function ClientsPage() {
         dir={dir}
         onSortChange={handleSort}
         emptyMessage="No clients yet. Add one or book a service to auto-create."
+        renderMobileCard={(c) => (
+          <MobileCardShell>
+            <MobileCardHeader
+              title={
+                <Link href={`/clients/${c._id}`} className="hover:text-primary">
+                  {c.name}
+                </Link>
+              }
+              subtitle={[c.phone, c.email].filter(Boolean).join(" · ")}
+            />
+            {c.address && (
+              <MobileCardBody className="border-t border-border/40 pt-3 text-xs">
+                {c.address}
+              </MobileCardBody>
+            )}
+            <MobileCardFooter>
+              <ClientEmailButton client={c} variant="outline" size="sm" className="h-9" />
+              <ButtonLink href={`/clients/${c._id}`} variant="outline" size="sm" className="h-9">
+                <Eye className="size-3.5" />
+                View
+              </ButtonLink>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-9"
+                onClick={() => openEdit(c)}
+              >
+                <Pencil className="size-3.5" />
+                Edit
+              </Button>
+            </MobileCardFooter>
+          </MobileCardShell>
+        )}
       />
 
       <Sheet open={formOpen} onOpenChange={setFormOpen}>

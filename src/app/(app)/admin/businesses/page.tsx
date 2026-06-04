@@ -26,6 +26,14 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/ui/data-table";
 import {
+  MobileCardFooter,
+  MobileCardHeader,
+  MobileCardShell,
+} from "@/components/ui/mobile-card";
+import {
+  ListPageHeader,
+} from "@/components/ui/mobile-list-toolbar";
+import {
   Sheet,
   SheetContent,
   SheetDescription,
@@ -217,33 +225,35 @@ export default function AdminBusinessesPage() {
   ];
 
   return (
-    <div className="animate-in fade-in slide-in-from-bottom-2 space-y-6 duration-500">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h3 className="text-lg font-semibold">Businesses</h3>
-          <p className="text-sm text-muted-foreground">
-            Add and manage tenants. Inactive businesses are hidden from the
-            header selector.
-          </p>
-        </div>
-        <Button onClick={openCreate}>
-          <Plus className="size-4" />
-          Add business
-        </Button>
-      </div>
+    <div className="animate-in fade-in slide-in-from-bottom-2 space-y-4 duration-500 sm:space-y-6">
+      <ListPageHeader
+        title="Businesses"
+        descriptionMobile="Manage tenants and business types."
+        description="Add and manage tenants. Inactive businesses are hidden from the header selector."
+        actions={
+          <Button className="col-span-2 sm:col-span-1" onClick={openCreate}>
+            <Plus className="size-4" />
+            Add business
+          </Button>
+        }
+      />
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-3 sm:gap-4">
         {statCards.map(({ label, value, icon: Icon, tint }) => (
           <div
             key={label}
-            className="card-elevated card-hover flex items-center justify-between rounded-xl bg-card p-4"
+            className="card-elevated card-hover flex items-center justify-between rounded-2xl bg-card p-4"
           >
             <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">{label}</p>
-              <p className="text-2xl font-semibold tabular-nums">{value}</p>
+              <p className="text-xs font-medium text-muted-foreground sm:text-sm">
+                {label}
+              </p>
+              <p className="text-xl font-semibold tabular-nums sm:text-2xl">
+                {value}
+              </p>
             </div>
             <div
-              className={`flex size-11 items-center justify-center rounded-xl ${tint}`}
+              className={`flex size-10 items-center justify-center rounded-xl sm:size-11 ${tint}`}
             >
               <Icon className="size-5" />
             </div>
@@ -251,27 +261,30 @@ export default function AdminBusinessesPage() {
         ))}
       </div>
 
-      <div>
       <DataTable
         columns={[
           {
             id: "name",
             header: "Name",
+            mobilePrimary: true,
             cell: (b) => <span className="font-medium">{b.name}</span>,
           },
           {
             id: "slug",
             header: "Slug",
+            hideOnMobile: true,
             cell: (b) => <span className="font-mono text-sm">{b.slug}</span>,
           },
           {
             id: "code",
             header: "Code",
+            hideOnMobile: true,
             cell: (b) => <span className="font-mono text-sm">{b.code}</span>,
           },
           {
             id: "type",
             header: "Type",
+            hideOnMobile: true,
             cell: (b) => (
               <Badge variant="outline">{businessTypeLabel(b.type)}</Badge>
             ),
@@ -279,11 +292,13 @@ export default function AdminBusinessesPage() {
           {
             id: "currency",
             header: "Currency",
+            hideOnMobile: true,
             cell: (b) => b.settings?.currency ?? "—",
           },
           {
             id: "status",
             header: "Status",
+            hideOnMobile: true,
             cell: (b) =>
               b.isActive ? (
                 <Badge variant="secondary">Active</Badge>
@@ -294,6 +309,7 @@ export default function AdminBusinessesPage() {
           {
             id: "actions",
             header: "Actions",
+            mobileActions: true,
             headerClassName: "text-right",
             className: "text-right",
             cell: (b) => (
@@ -331,8 +347,42 @@ export default function AdminBusinessesPage() {
         }
         meta={meta}
         onPageChange={setPage}
+        renderMobileCard={(b) => (
+          <MobileCardShell>
+            <MobileCardHeader
+              title={b.name}
+              subtitle={`${businessTypeLabel(b.type)} · ${b.code}`}
+              badge={
+                <Badge variant={b.isActive ? "secondary" : "outline"}>
+                  {b.isActive ? "Active" : "Inactive"}
+                </Badge>
+              }
+            />
+            <MobileCardFooter>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-9"
+                onClick={() => openEdit(b)}
+              >
+                <Pencil className="size-3.5" />
+                Edit
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-9"
+                onClick={() => toggleActive(b)}
+              >
+                <Trash2 className="size-3.5" />
+                {b.isActive ? "Deactivate" : "Activate"}
+              </Button>
+            </MobileCardFooter>
+          </MobileCardShell>
+        )}
       />
-      </div>
 
       <Sheet open={mode !== null} onOpenChange={(open) => !open && closeSheet()}>
         <SheetContent>

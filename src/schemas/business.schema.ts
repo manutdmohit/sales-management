@@ -5,6 +5,8 @@ const businessSettingsSchema = z.object({
   currency: z.string().optional(),
   timezone: z.string().optional(),
   invoicePrefix: z.string().optional(),
+  logoUrl: z.string().max(500).optional(),
+  address: z.string().max(500).optional(),
 });
 
 export const createBusinessSchema = z.object({

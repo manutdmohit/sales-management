@@ -1,12 +1,15 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import type { NextRequest } from "next/server";
+import type { UserRole } from "@/domain/roles";
+import { normalizeRole } from "@/domain/roles";
 import { SESSION_COOKIE, SESSION_MAX_AGE } from "./constants";
 
 export type SessionUser = {
   sub: string;
   email: string;
   name: string;
+  role: UserRole;
 };
 
 function getSecret() {
@@ -18,7 +21,7 @@ function getSecret() {
 }
 
 export async function createSessionToken(user: SessionUser): Promise<string> {
-  return new SignJWT({ email: user.email, name: user.name })
+  return new SignJWT({ email: user.email, name: user.name, role: user.role })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(user.sub)
     .setIssuedAt()
@@ -37,6 +40,9 @@ export async function verifySessionToken(
       sub,
       email: payload.email,
       name: typeof payload.name === "string" ? payload.name : payload.email,
+      role: normalizeRole(
+        typeof payload.role === "string" ? payload.role : undefined
+      ),
     };
   } catch {
     return null;

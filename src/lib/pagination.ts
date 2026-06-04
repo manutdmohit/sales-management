@@ -1,4 +1,9 @@
-export const DEFAULT_PAGE_SIZE = 20;
+import {
+  clampTablePageSize,
+  DEFAULT_TABLE_PAGE_SIZE,
+} from "@/domain/table-settings";
+
+export const DEFAULT_PAGE_SIZE = DEFAULT_TABLE_PAGE_SIZE;
 export const MAX_PAGE_SIZE = 100;
 
 export type PaginationMeta = {
@@ -39,12 +44,40 @@ export function parsePaginationParams(
 
   const page = Math.max(1, parseInt(pageParam, 10) || 1);
   const rawSize = parseInt(searchParams.get("pageSize") ?? "", 10);
-  const pageSize = Math.min(
-    MAX_PAGE_SIZE,
-    Math.max(1, Number.isNaN(rawSize) ? DEFAULT_PAGE_SIZE : rawSize)
-  );
+  const pageSize = Number.isNaN(rawSize)
+    ? DEFAULT_PAGE_SIZE
+    : clampTablePageSize(rawSize);
   const skip = (page - 1) * pageSize;
   return { page, pageSize, skip };
+}
+
+export type SortDir = "asc" | "desc";
+
+/**
+ * Parse `sort` / `dir` query params, restricting `sort` to an allow-list of
+ * fields. Falls back to the provided default when missing or not permitted.
+ */
+export function parseSortParams(
+  searchParams: URLSearchParams,
+  allowed: readonly string[],
+  fallback: { sort: string; dir: SortDir }
+): { sort: string; dir: SortDir } {
+  const sortParam = searchParams.get("sort");
+  const sort =
+    sortParam && allowed.includes(sortParam) ? sortParam : fallback.sort;
+  const dirParam = searchParams.get("dir");
+  const dir: SortDir =
+    dirParam === "asc" || dirParam === "desc" ? dirParam : fallback.dir;
+  return { sort, dir };
+}
+
+/** Build a Mongo sort object from a field + direction, with optional tiebreaker. */
+export function mongoSort(
+  sort: string,
+  dir: SortDir,
+  secondary?: Record<string, 1 | -1>
+): Record<string, 1 | -1> {
+  return { [sort]: dir === "asc" ? 1 : -1, ...(secondary ?? {}) };
 }
 
 export function paginationRange(

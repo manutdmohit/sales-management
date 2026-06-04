@@ -1,22 +1,30 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
+import {
+  Building2,
+  CheckCircle2,
+  Pencil,
+  PauseCircle,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useBusiness } from "@/lib/business-context";
 import { useConfirm } from "@/components/ui/confirm-provider";
+import { usePaginatedList } from "@/lib/use-paginated-list";
 import type { Business, BusinessType } from "@/domain/types";
-import { DEFAULT_PAGE_SIZE, type PaginationMeta } from "@/lib/pagination";
-import { fetchList } from "@/lib/fetch-list";
-import { Pagination } from "@/components/ui/pagination";
 import {
   BUSINESS_TYPES,
   BUSINESS_TYPE_LABELS,
+  DEFAULT_CURRENCY,
+  businessTypeLabel,
 } from "@/domain/business-types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { DataTable } from "@/components/ui/data-table";
 import {
   Sheet,
   SheetContent,
@@ -25,14 +33,6 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 
 type FormMode = "create" | "edit" | null;
 
@@ -41,7 +41,9 @@ const emptyForm = {
   slug: "",
   code: "",
   type: "GENERAL" as BusinessType,
-  currency: "INR",
+  currency: DEFAULT_CURRENCY,
+  logoUrl: "",
+  address: "",
 };
 
 function slugify(value: string) {
@@ -55,31 +57,39 @@ function slugify(value: string) {
 export default function AdminBusinessesPage() {
   const { refresh: refreshContext } = useBusiness();
   const { confirm } = useConfirm();
-  const [businesses, setBusinesses] = useState<Business[]>([]);
-  const [meta, setMeta] = useState<PaginationMeta | null>(null);
-  const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [mode, setMode] = useState<FormMode>(null);
   const [editing, setEditing] = useState<Business | null>(null);
   const [form, setForm] = useState(emptyForm);
 
-  const loadBusinesses = useCallback(async () => {
-    const params = new URLSearchParams({
-      all: "true",
-      page: String(page),
-      pageSize: String(DEFAULT_PAGE_SIZE),
-    });
-    const { items, meta: listMeta } = await fetchList<Business>(
-      `/api/businesses?${params}`
-    );
-    setBusinesses(items);
-    setMeta(listMeta);
-  }, [page]);
+  const buildUrl = useCallback(
+    (page: number, pageSize: number) => {
+      const params = new URLSearchParams({
+        all: "true",
+        page: String(page),
+        pageSize: String(pageSize),
+      });
+      return `/api/businesses?${params}`;
+    },
+    []
+  );
 
-  useEffect(() => {
-    loadBusinesses().finally(() => setLoading(false));
-  }, [loadBusinesses]);
+  const {
+    items: businesses,
+    meta,
+    setPage,
+    loading,
+    reload: loadBusinesses,
+  } = usePaginatedList<Business>(buildUrl, []);
+
+  const stats = useMemo(() => {
+    const active = businesses.filter((b) => b.isActive).length;
+    return {
+      total: meta?.total ?? businesses.length,
+      active,
+      inactive: businesses.length - active,
+    };
+  }, [businesses, meta]);
 
   function openCreate() {
     setMode("create");
@@ -96,6 +106,8 @@ export default function AdminBusinessesPage() {
       code: business.code,
       type: business.type,
       currency: business.settings?.currency ?? "",
+      logoUrl: business.settings?.logoUrl ?? "",
+      address: business.settings?.address ?? "",
     });
   }
 
@@ -119,7 +131,11 @@ export default function AdminBusinessesPage() {
             code: form.code,
             type: form.type,
             isActive: true,
-            settings: { currency: form.currency || undefined },
+            settings: {
+              currency: form.currency || undefined,
+              logoUrl: form.logoUrl.trim() || undefined,
+              address: form.address.trim() || undefined,
+            },
           }),
         });
         const json = await res.json();
@@ -132,7 +148,11 @@ export default function AdminBusinessesPage() {
           body: JSON.stringify({
             name: form.name,
             type: form.type,
-            settings: { currency: form.currency || undefined },
+            settings: {
+              currency: form.currency || undefined,
+              logoUrl: form.logoUrl.trim() || undefined,
+              address: form.address.trim() || undefined,
+            },
           }),
         });
         const json = await res.json();
@@ -175,15 +195,35 @@ export default function AdminBusinessesPage() {
     await refreshContext();
   }
 
+  const statCards = [
+    {
+      label: "Total businesses",
+      value: stats.total,
+      icon: Building2,
+      tint: "bg-chart-1/10 text-chart-1",
+    },
+    {
+      label: "Active",
+      value: stats.active,
+      icon: CheckCircle2,
+      tint: "bg-chart-5/10 text-chart-5",
+    },
+    {
+      label: "Inactive",
+      value: stats.inactive,
+      icon: PauseCircle,
+      tint: "bg-muted-foreground/10 text-muted-foreground",
+    },
+  ];
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
+    <div className="animate-in fade-in slide-in-from-bottom-2 space-y-6 duration-500">
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-sm text-muted-foreground">Admin</p>
-          <h2 className="text-2xl font-semibold">Businesses</h2>
-          <p className="text-muted-foreground">
-            Add and manage tenants. Inactive businesses are hidden from the header
-            selector.
+          <h3 className="text-lg font-semibold">Businesses</h3>
+          <p className="text-sm text-muted-foreground">
+            Add and manage tenants. Inactive businesses are hidden from the
+            header selector.
           </p>
         </div>
         <Button onClick={openCreate}>
@@ -192,82 +232,107 @@ export default function AdminBusinessesPage() {
         </Button>
       </div>
 
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Slug</TableHead>
-              <TableHead>Code</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Currency</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading && (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground">
-                  Loading…
-                </TableCell>
-              </TableRow>
-            )}
-            {!loading && businesses.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground">
-                  No businesses yet. Click Add business or run{" "}
-                  <code className="text-xs">npm run seed</code>.
-                </TableCell>
-              </TableRow>
-            )}
-            {businesses.map((b) => (
-              <TableRow key={b._id}>
-                <TableCell className="font-medium">{b.name}</TableCell>
-                <TableCell className="font-mono text-sm">{b.slug}</TableCell>
-                <TableCell className="font-mono text-sm">{b.code}</TableCell>
-                <TableCell>
-                  <Badge variant="outline">
-                    {BUSINESS_TYPE_LABELS[b.type]}
-                  </Badge>
-                </TableCell>
-                <TableCell>{b.settings?.currency ?? "—"}</TableCell>
-                <TableCell>
-                  {b.isActive ? (
-                    <Badge variant="secondary">Active</Badge>
-                  ) : (
-                    <Badge variant="outline">Inactive</Badge>
-                  )}
-                </TableCell>
-                <TableCell className="text-right">
-                  <div className="flex justify-end gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={() => openEdit(b)}
-                      aria-label={`Edit ${b.name}`}
-                    >
-                      <Pencil className="size-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={() => toggleActive(b)}
-                      aria-label={b.isActive ? `Deactivate ${b.name}` : `Reactivate ${b.name}`}
-                    >
-                      <Trash2 className="size-4" />
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+      <div className="grid gap-4 sm:grid-cols-3">
+        {statCards.map(({ label, value, icon: Icon, tint }) => (
+          <div
+            key={label}
+            className="card-elevated card-hover flex items-center justify-between rounded-xl bg-card p-4"
+          >
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">{label}</p>
+              <p className="text-2xl font-semibold tabular-nums">{value}</p>
+            </div>
+            <div
+              className={`flex size-11 items-center justify-center rounded-xl ${tint}`}
+            >
+              <Icon className="size-5" />
+            </div>
+          </div>
+        ))}
       </div>
 
-      {meta && meta.totalPages > 1 && (
-        <Pagination meta={meta} onPageChange={setPage} />
-      )}
+      <div>
+      <DataTable
+        columns={[
+          {
+            id: "name",
+            header: "Name",
+            cell: (b) => <span className="font-medium">{b.name}</span>,
+          },
+          {
+            id: "slug",
+            header: "Slug",
+            cell: (b) => <span className="font-mono text-sm">{b.slug}</span>,
+          },
+          {
+            id: "code",
+            header: "Code",
+            cell: (b) => <span className="font-mono text-sm">{b.code}</span>,
+          },
+          {
+            id: "type",
+            header: "Type",
+            cell: (b) => (
+              <Badge variant="outline">{businessTypeLabel(b.type)}</Badge>
+            ),
+          },
+          {
+            id: "currency",
+            header: "Currency",
+            cell: (b) => b.settings?.currency ?? "—",
+          },
+          {
+            id: "status",
+            header: "Status",
+            cell: (b) =>
+              b.isActive ? (
+                <Badge variant="secondary">Active</Badge>
+              ) : (
+                <Badge variant="outline">Inactive</Badge>
+              ),
+          },
+          {
+            id: "actions",
+            header: "Actions",
+            headerClassName: "text-right",
+            className: "text-right",
+            cell: (b) => (
+              <div className="flex justify-end gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => openEdit(b)}
+                  aria-label={`Edit ${b.name}`}
+                >
+                  <Pencil className="size-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => toggleActive(b)}
+                  aria-label={
+                    b.isActive ? `Deactivate ${b.name}` : `Reactivate ${b.name}`
+                  }
+                >
+                  <Trash2 className="size-4" />
+                </Button>
+              </div>
+            ),
+          },
+        ]}
+        data={businesses}
+        rowKey={(b) => b._id}
+        loading={loading}
+        emptyMessage={
+          <>
+            No businesses yet. Click Add business or run{" "}
+            <code className="text-xs">npm run seed</code>.
+          </>
+        }
+        meta={meta}
+        onPageChange={setPage}
+      />
+      </div>
 
       <Sheet open={mode !== null} onOpenChange={(open) => !open && closeSheet()}>
         <SheetContent>
@@ -309,7 +374,7 @@ export default function AdminBusinessesPage() {
                 <select
                   id="type"
                   required
-                  className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                  className="h-9 w-full cursor-pointer rounded-md border bg-background px-3 text-sm"
                   value={form.type}
                   onChange={(e) =>
                     setForm((f) => ({
@@ -369,10 +434,38 @@ export default function AdminBusinessesPage() {
               )}
 
               <div className="space-y-2">
+                <Label htmlFor="logoUrl">Logo URL</Label>
+                <Input
+                  id="logoUrl"
+                  placeholder="/images/logo/magic-touch-logo.jpg"
+                  value={form.logoUrl}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, logoUrl: e.target.value }))
+                  }
+                />
+                <p className="text-xs text-muted-foreground">
+                  Path under <code className="text-foreground">public/</code>, e.g.{" "}
+                  <code className="text-foreground">/images/logo/your-logo.jpg</code>
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="address">Address</Label>
+                <Input
+                  id="address"
+                  placeholder="Street, area, city"
+                  value={form.address}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, address: e.target.value }))
+                  }
+                />
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="currency">Currency</Label>
                 <Input
                   id="currency"
-                  placeholder="INR"
+                  placeholder={DEFAULT_CURRENCY}
                   value={form.currency}
                   onChange={(e) =>
                     setForm((f) => ({ ...f, currency: e.target.value }))

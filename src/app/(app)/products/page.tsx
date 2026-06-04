@@ -1,19 +1,24 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Pencil, Plus, Trash2, FolderOpen } from "lucide-react";
 import { toast } from "sonner";
 import { useBusiness } from "@/lib/business-context";
 import { useConfirm } from "@/components/ui/confirm-provider";
-import type { Product } from "@/domain/types";
-import { DEFAULT_PAGE_SIZE, type PaginationMeta } from "@/lib/pagination";
-import { fetchList } from "@/lib/fetch-list";
-import { Pagination } from "@/components/ui/pagination";
-import { BUSINESS_TYPE_LABELS } from "@/domain/business-types";
+import { usePaginatedList } from "@/lib/use-paginated-list";
+import type { SortDir } from "@/lib/pagination";
+import type { Product, ProductCategory, ProductKind } from "@/domain/types";
+import { businessTypeLabel } from "@/domain/business-types";
+import { hasFeature } from "@/domain/capabilities";
+import { defaultUnitForKind, getUnitSymbol, type StockUnitId } from "@/domain/units";
+import { UnitSelect } from "@/components/products/unit-select";
+import { CategoryManagerSheet } from "@/components/products/category-manager";
+import { formatQuantityWithUnit } from "@/lib/format-quantity";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { DataTable } from "@/components/ui/data-table";
 import {
   Sheet,
   SheetContent,
@@ -22,16 +27,10 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 
 type FormMode = "create" | "edit" | null;
+
+type RecipeLineForm = { rawProductId: string; quantityPerUnit: string };
 
 const emptyForm = {
   name: "",
@@ -41,6 +40,10 @@ const emptyForm = {
   selling: "",
   minStock: "0",
   trackExpiry: false,
+  productKind: "FINISHED" as ProductKind,
+  unitId: defaultUnitForKind("FINISHED"),
+  categoryId: "",
+  recipeLines: [] as RecipeLineForm[],
 };
 
 function slugify(value: string) {
@@ -54,48 +57,249 @@ function slugify(value: string) {
 export default function ProductsPage() {
   const { businessId, businesses, loading: businessLoading } = useBusiness();
   const { confirm } = useConfirm();
-  const [products, setProducts] = useState<Product[]>([]);
-  const [meta, setMeta] = useState<PaginationMeta | null>(null);
-  const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
+  const [sort, setSort] = useState("name");
+  const [dir, setDir] = useState<SortDir>("asc");
   const [mode, setMode] = useState<FormMode>(null);
   const [editing, setEditing] = useState<Product | null>(null);
   const [form, setForm] = useState(emptyForm);
+  const [rawProducts, setRawProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<ProductCategory[]>([]);
+  const [categoryFilter, setCategoryFilter] = useState<string>("ALL");
+  const [categoriesOpen, setCategoriesOpen] = useState(false);
 
   const selectedBusiness = businesses.find((b) => b._id === businessId);
+  const isManufacturer = hasFeature(selectedBusiness?.type, "manufacturing");
 
-  const loadProducts = useCallback(async () => {
-    if (!businessId) return;
-    const params = new URLSearchParams({
-      businessId,
-      all: "true",
-      page: String(page),
-      pageSize: String(DEFAULT_PAGE_SIZE),
+  const categoryById = useMemo(
+    () => new Map(categories.map((c) => [c._id, c])),
+    [categories]
+  );
+
+  const loadCategories = useCallback(async () => {
+    if (!businessId) {
+      setCategories([]);
+      return;
+    }
+    const res = await fetch(`/api/categories?businessId=${businessId}`, {
+      cache: "no-store",
     });
-    if (search.trim()) params.set("search", search.trim());
-    const { items, meta: listMeta } = await fetchList<Product>(
-      `/api/products?${params}`
-    );
-    setProducts(items);
-    setMeta(listMeta);
-  }, [businessId, search, page]);
-
-  useEffect(() => {
-    setPage(1);
+    const json = await res.json();
+    setCategories(json.data ?? []);
   }, [businessId]);
 
   useEffect(() => {
-    if (!businessId) {
-      setProducts([]);
-      setMeta(null);
-      setLoading(false);
+    void loadCategories();
+  }, [loadCategories]);
+
+  const buildUrl = useCallback(
+    (page: number, pageSize: number) => {
+      if (!businessId) return null;
+      const params = new URLSearchParams({
+        businessId,
+        all: "true",
+        page: String(page),
+        pageSize: String(pageSize),
+      });
+      if (search.trim()) params.set("search", search.trim());
+      if (categoryFilter === "uncategorized") {
+        params.set("uncategorized", "true");
+      } else if (categoryFilter !== "ALL") {
+        params.set("categoryId", categoryFilter);
+      }
+      params.set("sort", sort);
+      params.set("dir", dir);
+      return `/api/products?${params}`;
+    },
+    [businessId, search, sort, dir, categoryFilter]
+  );
+
+  const {
+    items: products,
+    meta,
+    page,
+    setPage,
+    loading,
+    reload: loadProducts,
+  } = usePaginatedList<Product>(buildUrl, [businessId, search, sort, dir, categoryFilter]);
+
+  useEffect(() => {
+    if (!businessId || !isManufacturer) {
+      setRawProducts([]);
       return;
     }
-    setLoading(true);
-    loadProducts().finally(() => setLoading(false));
-  }, [businessId, loadProducts]);
+    fetch(`/api/products?businessId=${businessId}&productKind=RAW&all=true`)
+      .then((r) => r.json())
+      .then((json) => setRawProducts(json.data ?? []));
+  }, [businessId, isManufacturer, mode]);
+
+  function handleSort(key: string, nextDir: SortDir) {
+    setSort(key);
+    setDir(nextDir);
+  }
+
+  const columns = useMemo(
+    () => [
+      {
+        id: "name",
+        header: "Name",
+        sortKey: "name",
+        cell: (p: Product) => (
+          <span className="font-medium">{p.name}</span>
+        ),
+      },
+      {
+        id: "category",
+        header: "Category",
+        cell: (p: Product) =>
+          p.categoryId ? (
+            categoryById.get(p.categoryId)?.name ?? "—"
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          ),
+      },
+      {
+        id: "type",
+        header: "Business type",
+        cell: (p: Product) => (
+          <Badge variant="outline">
+            {businessTypeLabel(p.businessType)}
+          </Badge>
+        ),
+      },
+      ...(isManufacturer
+        ? [
+            {
+              id: "productKind",
+              header: "Kind",
+              cell: (p: Product) => (
+                <Badge variant={p.productKind === "RAW" ? "secondary" : "default"}>
+                  {p.productKind === "RAW" ? "Raw" : "Finished"}
+                </Badge>
+              ),
+            },
+          ]
+        : []),
+      {
+        id: "sku",
+        header: "SKU",
+        sortKey: "sku",
+        cell: (p: Product) => (
+          <span className="font-mono text-sm">{p.sku}</span>
+        ),
+      },
+      {
+        id: "unit",
+        header: "Unit",
+        cell: (p: Product) => (
+          <span className="text-muted-foreground">
+            {getUnitSymbol(p.unitId) ?? "—"}
+          </span>
+        ),
+      },
+      {
+        id: "purchase",
+        header: "Purchase",
+        headerClassName: "text-right",
+        className: "text-right font-mono",
+        cell: (p: Product) => p.pricing.purchase.toFixed(2),
+      },
+      {
+        id: "selling",
+        header: "Selling",
+        sortKey: "pricing.selling",
+        headerClassName: "text-right",
+        className: "text-right font-mono",
+        cell: (p: Product) => p.pricing.selling.toFixed(2),
+      },
+      {
+        id: "unitCost",
+        header: "Unit cost",
+        headerClassName: "text-right",
+        className: "text-right font-mono",
+        cell: (p: Product) => {
+          const cost = p.pricing.unitCost ?? p.pricing.purchase;
+          return cost.toFixed(2);
+        },
+      },
+      {
+        id: "margin",
+        header: "Margin",
+        headerClassName: "text-right",
+        className: "text-right font-mono",
+        cell: (p: Product) => {
+          const cost = p.pricing.unitCost ?? p.pricing.purchase;
+          const margin = p.pricing.selling - cost;
+          return margin.toFixed(2);
+        },
+      },
+      {
+        id: "marginPct",
+        header: "Margin %",
+        headerClassName: "text-right",
+        className: "text-right font-mono",
+        cell: (p: Product) => {
+          const cost = p.pricing.unitCost ?? p.pricing.purchase;
+          if (p.pricing.selling <= 0) return "—";
+          const pct = ((p.pricing.selling - cost) / p.pricing.selling) * 100;
+          return `${pct.toFixed(1)}%`;
+        },
+      },
+      {
+        id: "minStock",
+        header: "Min stock",
+        sortKey: "minStock",
+        cell: (p: Product) => formatQuantityWithUnit(p.minStock, p.unitId),
+      },
+      {
+        id: "expiry",
+        header: "Expiry",
+        cell: (p: Product) => (p.trackExpiry ? "Yes" : "No"),
+      },
+      {
+        id: "status",
+        header: "Status",
+        cell: (p: Product) =>
+          p.isActive ? (
+            <Badge variant="secondary">Active</Badge>
+          ) : (
+            <Badge variant="outline">Inactive</Badge>
+          ),
+      },
+      {
+        id: "actions",
+        header: "Actions",
+        headerClassName: "text-right",
+        className: "text-right",
+        cell: (p: Product) => (
+          <div className="flex justify-end gap-1">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => openEdit(p)}
+              aria-label={`Edit ${p.name}`}
+            >
+              <Pencil className="size-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => toggleActive(p)}
+              aria-label={
+                p.isActive ? `Deactivate ${p.name}` : `Reactivate ${p.name}`
+              }
+            >
+              <Trash2 className="size-4" />
+            </Button>
+          </div>
+        ),
+      },
+    ],
+    // openEdit/toggleActive/isManufacturer are stable enough for column defs
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [isManufacturer, categoryById]
+  );
 
   function openCreate() {
     setMode("create");
@@ -114,6 +318,14 @@ export default function ProductsPage() {
       selling: String(product.pricing.selling),
       minStock: String(product.minStock),
       trackExpiry: product.trackExpiry,
+      productKind: product.productKind,
+      unitId: (product.unitId ?? defaultUnitForKind(product.productKind)) as StockUnitId,
+      categoryId: product.categoryId ?? "",
+      recipeLines:
+        product.recipe?.map((line) => ({
+          rawProductId: line.rawProductId,
+          quantityPerUnit: String(line.quantityPerUnit),
+        })) ?? [],
     });
   }
 
@@ -138,6 +350,19 @@ export default function ProductsPage() {
 
     setSaving(true);
     try {
+      const recipe =
+        isManufacturer &&
+        form.productKind === "FINISHED" &&
+        form.recipeLines.length > 0
+          ? form.recipeLines
+              .filter((l) => l.rawProductId && l.quantityPerUnit)
+              .map((l) => ({
+                rawProductId: l.rawProductId,
+                quantityPerUnit: Number(l.quantityPerUnit),
+              }))
+              .filter((l) => l.quantityPerUnit > 0)
+          : undefined;
+
       if (mode === "create") {
         const res = await fetch("/api/products", {
           method: "POST",
@@ -150,7 +375,10 @@ export default function ProductsPage() {
             pricing: { purchase, selling },
             trackExpiry: form.trackExpiry,
             minStock,
+            unitId: form.unitId,
+            categoryId: form.categoryId || null,
             isActive: true,
+            ...(isManufacturer && { productKind: form.productKind, recipe }),
           }),
         });
         const json = await res.json();
@@ -165,6 +393,12 @@ export default function ProductsPage() {
             pricing: { purchase, selling },
             trackExpiry: form.trackExpiry,
             minStock,
+            unitId: form.unitId,
+            categoryId: form.categoryId || null,
+            ...(isManufacturer && {
+              productKind: form.productKind,
+              recipe: form.productKind === "FINISHED" ? recipe : [],
+            }),
           }),
         });
         const json = await res.json();
@@ -235,131 +469,82 @@ export default function ProductsPage() {
             </span>
             {selectedBusiness && (
               <Badge variant="outline" className="ml-2 align-middle">
-                {BUSINESS_TYPE_LABELS[selectedBusiness.type]}
+                {businessTypeLabel(selectedBusiness.type)}
               </Badge>
             )}
-            . Products are scoped to this business and type. Stock comes from
-            purchases and sales.
+            . Products are scoped to this business. Stock comes from purchases,
+            production, and sales.
           </p>
         </div>
-        <Button onClick={openCreate}>
-          <Plus className="size-4" />
-          Add product
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => setCategoriesOpen(true)}>
+            <FolderOpen className="size-4" />
+            Categories
+          </Button>
+          <Button onClick={openCreate}>
+            <Plus className="size-4" />
+            Add product
+          </Button>
+        </div>
       </div>
 
-      <div className="flex max-w-sm gap-2">
-        <Input
-          placeholder="Search name or SKU…"
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setPage(1);
-          }}
-        />
-        <Button
-          variant="outline"
-          onClick={() => {
-            setPage(1);
-            loadProducts();
-          }}
-        >
-          Search
-        </Button>
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="flex max-w-sm flex-1 gap-2">
+          <Input
+            placeholder="Search name or SKU…"
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
+          />
+          <Button variant="outline" onClick={() => loadProducts()}>
+            Search
+          </Button>
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="category-filter" className="text-xs text-muted-foreground">
+            Category
+          </Label>
+          <select
+            id="category-filter"
+            className="h-9 min-w-[10rem] rounded-md border bg-background px-3 text-sm"
+            value={categoryFilter}
+            onChange={(e) => {
+              setCategoryFilter(e.target.value);
+              setPage(1);
+            }}
+          >
+            <option value="ALL">All categories</option>
+            <option value="uncategorized">Uncategorized</option>
+            {categories
+              .filter((c) => c.isActive)
+              .map((c) => (
+                <option key={c._id} value={c._id}>
+                  {c.name}
+                </option>
+              ))}
+          </select>
+        </div>
       </div>
 
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Business type</TableHead>
-              <TableHead>SKU</TableHead>
-              <TableHead className="text-right">Purchase</TableHead>
-              <TableHead className="text-right">Selling</TableHead>
-              <TableHead>Min stock</TableHead>
-              <TableHead>Expiry</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading && (
-              <TableRow>
-                <TableCell
-                  colSpan={9}
-                  className="text-center text-muted-foreground"
-                >
-                  Loading…
-                </TableCell>
-              </TableRow>
-            )}
-            {!loading && products.length === 0 && (
-              <TableRow>
-                <TableCell
-                  colSpan={9}
-                  className="text-center text-muted-foreground"
-                >
-                  No products yet. Click Add product or run{" "}
-                  <code className="text-xs">npm run seed</code>.
-                </TableCell>
-              </TableRow>
-            )}
-            {products.map((p) => (
-              <TableRow key={p._id}>
-                <TableCell className="font-medium">{p.name}</TableCell>
-                <TableCell>
-                  <Badge variant="outline">
-                    {BUSINESS_TYPE_LABELS[p.businessType]}
-                  </Badge>
-                </TableCell>
-                <TableCell className="font-mono text-sm">{p.sku}</TableCell>
-                <TableCell className="text-right">
-                  {p.pricing.purchase.toFixed(2)}
-                </TableCell>
-                <TableCell className="text-right">
-                  {p.pricing.selling.toFixed(2)}
-                </TableCell>
-                <TableCell>{p.minStock}</TableCell>
-                <TableCell>{p.trackExpiry ? "Yes" : "No"}</TableCell>
-                <TableCell>
-                  {p.isActive ? (
-                    <Badge variant="secondary">Active</Badge>
-                  ) : (
-                    <Badge variant="outline">Inactive</Badge>
-                  )}
-                </TableCell>
-                <TableCell className="text-right">
-                  <div className="flex justify-end gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={() => openEdit(p)}
-                      aria-label={`Edit ${p.name}`}
-                    >
-                      <Pencil className="size-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={() => toggleActive(p)}
-                      aria-label={
-                        p.isActive ? `Deactivate ${p.name}` : `Reactivate ${p.name}`
-                      }
-                    >
-                      <Trash2 className="size-4" />
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-
-      {meta && meta.totalPages > 1 && (
-        <Pagination meta={meta} onPageChange={setPage} />
-      )}
+      <DataTable
+        columns={columns}
+        data={products}
+        rowKey={(p) => p._id}
+        loading={loading}
+        emptyMessage={
+          <>
+            No products yet. Click Add product or run{" "}
+            <code className="text-xs">npm run seed</code>.
+          </>
+        }
+        meta={meta}
+        onPageChange={setPage}
+        sort={sort}
+        dir={dir}
+        onSortChange={handleSort}
+      />
 
       <Sheet open={mode !== null} onOpenChange={(open) => !open && closeSheet()}>
         <SheetContent>
@@ -370,7 +555,7 @@ export default function ProductsPage() {
               </SheetTitle>
               <SheetDescription>
                 {mode === "create"
-                  ? `SKU must be unique within ${selectedBusiness?.name ?? "this business"}. Business type: ${selectedBusiness ? BUSINESS_TYPE_LABELS[selectedBusiness.type] : "—"}.`
+                  ? `SKU must be unique within ${selectedBusiness?.name ?? "this business"}. Business type: ${selectedBusiness ? businessTypeLabel(selectedBusiness.type) : "—"}.`
                   : "SKU and slug cannot be changed after creation."}
               </SheetDescription>
             </SheetHeader>
@@ -437,6 +622,160 @@ export default function ProductsPage() {
                     <p className="text-muted-foreground">SKU</p>
                     <p className="font-mono">{editing.sku}</p>
                   </div>
+                </div>
+              )}
+
+              {isManufacturer && (
+                <div className="space-y-2">
+                  <Label htmlFor="productKind">Product kind</Label>
+                  <select
+                    id="productKind"
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs"
+                    value={form.productKind}
+                    onChange={(e) =>
+                      setForm((f) => ({
+                        ...f,
+                        productKind: e.target.value as ProductKind,
+                        unitId: defaultUnitForKind(e.target.value as ProductKind),
+                        recipeLines:
+                          e.target.value === "FINISHED" ? f.recipeLines : [],
+                      }))
+                    }
+                  >
+                    <option value="RAW">Raw material</option>
+                    <option value="FINISHED">Finished good</option>
+                  </select>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label htmlFor="categoryId">Category</Label>
+                <select
+                  id="categoryId"
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs"
+                  value={form.categoryId}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, categoryId: e.target.value }))
+                  }
+                >
+                  <option value="">No category</option>
+                  {categories
+                    .filter((c) => c.isActive)
+                    .map((c) => (
+                      <option key={c._id} value={c._id}>
+                        {c.name}
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="unitId">Stock unit</Label>
+                <UnitSelect
+                  id="unitId"
+                  value={form.unitId}
+                  productKind={isManufacturer ? form.productKind : undefined}
+                  onChange={(unitId) => setForm((f) => ({ ...f, unitId }))}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Inventory, purchases, and recipes use this unit for this
+                  product.
+                </p>
+              </div>
+
+              {isManufacturer && form.productKind === "FINISHED" && (
+                <div className="space-y-3 rounded-md border p-3">
+                  <div className="flex items-center justify-between">
+                    <Label>Recipe (raw materials per unit)</Label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setForm((f) => ({
+                          ...f,
+                          recipeLines: [
+                            ...f.recipeLines,
+                            { rawProductId: "", quantityPerUnit: "1" },
+                          ],
+                        }))
+                      }
+                    >
+                      Add ingredient
+                    </Button>
+                  </div>
+                  {form.recipeLines.length === 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      Amounts are in each raw material&apos;s stock unit (per 1{" "}
+                      {getUnitSymbol(form.unitId) ?? "finished unit"}).
+                    </p>
+                  )}
+                  {form.recipeLines.map((line, index) => {
+                    const rawUnit = getUnitSymbol(
+                      rawProducts.find((p) => p._id === line.rawProductId)
+                        ?.unitId
+                    );
+                    return (
+                    <div key={index} className="grid grid-cols-5 gap-2">
+                      <select
+                        className="col-span-3 flex h-9 rounded-md border border-input bg-transparent px-2 text-sm"
+                        value={line.rawProductId}
+                        onChange={(e) =>
+                          setForm((f) => ({
+                            ...f,
+                            recipeLines: f.recipeLines.map((l, i) =>
+                              i === index
+                                ? { ...l, rawProductId: e.target.value }
+                                : l
+                            ),
+                          }))
+                        }
+                      >
+                        <option value="">Raw material…</option>
+                        {rawProducts.map((p) => (
+                          <option key={p._id} value={p._id}>
+                            {p.name}
+                          </option>
+                        ))}
+                      </select>
+                      <Input
+                        className="col-span-1"
+                        type="number"
+                        min="0.001"
+                        step="any"
+                        placeholder={rawUnit ?? "Qty"}
+                        title={rawUnit ? `Per finished unit, in ${rawUnit}` : undefined}
+                        value={line.quantityPerUnit}
+                        onChange={(e) =>
+                          setForm((f) => ({
+                            ...f,
+                            recipeLines: f.recipeLines.map((l, i) =>
+                              i === index
+                                ? { ...l, quantityPerUnit: e.target.value }
+                                : l
+                            ),
+                          }))
+                        }
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        className="col-span-1"
+                        onClick={() =>
+                          setForm((f) => ({
+                            ...f,
+                            recipeLines: f.recipeLines.filter(
+                              (_, i) => i !== index
+                            ),
+                          }))
+                        }
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </div>
+                    );
+                  })}
                 </div>
               )}
 
@@ -509,6 +848,13 @@ export default function ProductsPage() {
           </form>
         </SheetContent>
       </Sheet>
+
+      <CategoryManagerSheet
+        businessId={businessId}
+        open={categoriesOpen}
+        onOpenChange={setCategoriesOpen}
+        onChanged={() => void loadCategories()}
+      />
     </div>
   );
 }

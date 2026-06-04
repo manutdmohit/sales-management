@@ -7,8 +7,6 @@ export function PageTransition({ children }: { children: ReactNode }) {
   const pathname = usePathname();
 
   return (
-    <div key={pathname} className="page-enter animate-in fade-in slide-in-from-bottom-2 duration-300">
-      {children}
-    </div>
+    <div key={pathname}>{children}</div>
   );
 }

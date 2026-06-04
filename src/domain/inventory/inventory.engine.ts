@@ -3,11 +3,13 @@ import type { InventoryTransaction, InventoryTransactionType } from "@/domain/ty
 const POSITIVE_TYPES: InventoryTransactionType[] = [
   "PURCHASE",
   "RETURN",
+  "PRODUCTION_OUTPUT",
 ];
 const NEGATIVE_TYPES: InventoryTransactionType[] = [
   "SALE",
   "DAMAGE",
   "EXPIRED",
+  "PRODUCTION_CONSUME",
 ];
 
 /**
@@ -25,13 +27,18 @@ export function signedQuantity(
   return quantity;
 }
 
+function normalizeQuantity(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
 export function calculateStockFromTransactions(
   transactions: InventoryTransaction[]
 ): number {
-  return transactions.reduce(
+  const total = transactions.reduce(
     (sum, tx) => sum + signedQuantity(tx.type, tx.quantity),
     0
   );
+  return normalizeQuantity(total);
 }
 
 export function validateStockAvailability(
@@ -47,7 +54,8 @@ export function groupStockByProduct(
   const map = new Map<string, number>();
   for (const tx of transactions) {
     const delta = signedQuantity(tx.type, tx.quantity);
-    map.set(tx.productId, (map.get(tx.productId) ?? 0) + delta);
+    const next = (map.get(tx.productId) ?? 0) + delta;
+    map.set(tx.productId, normalizeQuantity(next));
   }
   return map;
 }

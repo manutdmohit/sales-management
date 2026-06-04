@@ -1,17 +1,23 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { PackagePlus, SlidersHorizontal } from "lucide-react";
+import { AlertTriangle, CalendarX, PackagePlus, SlidersHorizontal, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useBusiness } from "@/lib/business-context";
-import type { StockSummary } from "@/domain/types";
-import { DEFAULT_PAGE_SIZE, type PaginationMeta } from "@/lib/pagination";
-import { fetchList } from "@/lib/fetch-list";
-import { Pagination } from "@/components/ui/pagination";
+import { hasFeature } from "@/domain/capabilities";
+import { notifyNotificationsChanged } from "@/lib/notifications-client";
+import { formatQuantityWithUnit } from "@/lib/format-quantity";
+import { usePaginatedList } from "@/lib/use-paginated-list";
+import type { SortDir } from "@/lib/pagination";
+import type { ProductKind, StockSummary } from "@/domain/types";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DataTable } from "@/components/ui/data-table";
+import { formatDateYmd } from "@/lib/format-datetime";
+import { useConfirm } from "@/components/ui/confirm-provider";
 import {
   Sheet,
   SheetContent,
@@ -20,53 +26,105 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+
+type ProductKindFilter = "ALL" | ProductKind;
+
+type ExpiryAlertRow = {
+  _id: string;
+  productName: string;
+  sku: string;
+  batchNumber: string;
+  remainingQuantity: number;
+  unitId?: string;
+  expiryDate: string;
+  level: "warning" | "critical";
+};
+
+const KIND_FILTERS: { id: ProductKindFilter; label: string }[] = [
+  { id: "ALL", label: "All" },
+  { id: "RAW", label: "Raw materials" },
+  { id: "FINISHED", label: "Finished goods" },
+];
 
 export default function InventoryPage() {
   const { businessId, businesses, loading: businessLoading } = useBusiness();
-  const [rows, setRows] = useState<StockSummary[]>([]);
-  const [meta, setMeta] = useState<PaginationMeta | null>(null);
-  const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(true);
+  const { confirm } = useConfirm();
+  const selectedBusiness = businesses.find((b) => b._id === businessId);
+  const isManufacturer = hasFeature(selectedBusiness?.type, "manufacturing");
   const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState("");
+  const [kindFilter, setKindFilter] = useState<ProductKindFilter>("ALL");
+  const [sort, setSort] = useState("name");
+  const [dir, setDir] = useState<SortDir>("asc");
   const [adjustOpen, setAdjustOpen] = useState(false);
   const [selected, setSelected] = useState<StockSummary | null>(null);
   const [quantity, setQuantity] = useState("");
   const [notes, setNotes] = useState("");
+  const [expiryAlerts, setExpiryAlerts] = useState<ExpiryAlertRow[]>([]);
+  const [expiryLoading, setExpiryLoading] = useState(false);
+  const [writeOffBatchId, setWriteOffBatchId] = useState<string | null>(null);
 
-  const loadRows = useCallback(async () => {
-    if (!businessId) return;
-    const params = new URLSearchParams({
-      businessId,
-      page: String(page),
-      pageSize: String(DEFAULT_PAGE_SIZE),
-    });
-    const { items, meta: listMeta } = await fetchList<StockSummary>(
-      `/api/inventory?${params}`
-    );
-    setRows(items);
-    setMeta(listMeta);
-  }, [businessId, page]);
-
-  useEffect(() => {
-    setPage(1);
+  const loadExpiryAlerts = useCallback(async () => {
+    if (!businessId) {
+      setExpiryAlerts([]);
+      return;
+    }
+    setExpiryLoading(true);
+    try {
+      const res = await fetch(`/api/inventory/expiring?businessId=${businessId}`, {
+        cache: "no-store",
+      });
+      const json = await res.json();
+      setExpiryAlerts(json.data ?? []);
+    } catch {
+      setExpiryAlerts([]);
+    } finally {
+      setExpiryLoading(false);
+    }
   }, [businessId]);
 
   useEffect(() => {
-    if (!businessId) {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    loadRows().finally(() => setLoading(false));
-  }, [businessId, loadRows]);
+    void loadExpiryAlerts();
+  }, [loadExpiryAlerts]);
+
+  const buildUrl = useCallback(
+    (page: number, pageSize: number) => {
+      if (!businessId) return null;
+      const params = new URLSearchParams({
+        businessId,
+        page: String(page),
+        pageSize: String(pageSize),
+      });
+      if (search.trim()) params.set("search", search.trim());
+      if (isManufacturer && kindFilter !== "ALL") {
+        params.set("productKind", kindFilter);
+      }
+      params.set("sort", sort);
+      params.set("dir", dir);
+      return `/api/inventory?${params}`;
+    },
+    [businessId, search, kindFilter, isManufacturer, sort, dir]
+  );
+
+  const {
+    items: rows,
+    meta,
+    setPage,
+    loading,
+    reload: loadRows,
+  } = usePaginatedList<StockSummary>(buildUrl, [
+    businessId,
+    search,
+    kindFilter,
+    isManufacturer,
+    sort,
+    dir,
+  ]);
+
+  function handleSort(key: string, nextDir: SortDir) {
+    setSort(key);
+    setDir(nextDir);
+  }
 
   function openAdjust(row: StockSummary) {
     setSelected(row);
@@ -100,14 +158,59 @@ export default function InventoryPage() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Adjustment failed");
       toast.success(
-        `Stock updated for ${selected.productName} (${qty > 0 ? "+" : ""}${qty})`
+        `Stock updated for ${selected.productName} (${qty > 0 ? "+" : ""}${formatQuantityWithUnit(Math.abs(qty), selected.unitId)})`
       );
+      notifyNotificationsChanged();
       setAdjustOpen(false);
       await loadRows();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Request failed");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleWriteOff(row: ExpiryAlertRow) {
+    if (!businessId) return;
+
+    const qtyLabel = formatQuantityWithUnit(row.remainingQuantity, row.unitId);
+    const ok = await confirm({
+      title:
+        row.level === "critical"
+          ? "Write off expired batch?"
+          : "Write off expiring batch?",
+      description: `${row.productName} · Batch ${row.batchNumber} · ${qtyLabel} will be removed from stock and recorded as expired.`,
+      confirmLabel: "Write off",
+      cancelLabel: "Keep in stock",
+      variant: "warning",
+      cancelToast: "Batch kept in stock",
+    });
+    if (!ok) return;
+
+    setWriteOffBatchId(row._id);
+    try {
+      const res = await fetch("/api/inventory/write-offs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          businessId,
+          batchId: row._id,
+          type: "EXPIRED",
+          notes:
+            row.level === "critical"
+              ? `Expired batch ${row.batchNumber}`
+              : `Disposed before expiry — batch ${row.batchNumber}`,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Write-off failed");
+      toast.success("Batch written off");
+      await Promise.all([loadRows(), loadExpiryAlerts()]);
+      notifyNotificationsChanged();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Write-off failed");
+    } finally {
+      setWriteOffBatchId(null);
     }
   }
 
@@ -144,68 +247,177 @@ export default function InventoryPage() {
         </ButtonLink>
       </div>
 
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Product</TableHead>
-              <TableHead>SKU</TableHead>
-              <TableHead className="text-right">Stock</TableHead>
-              <TableHead className="text-right">Min</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading && (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground">
-                  Loading…
-                </TableCell>
-              </TableRow>
-            )}
-            {!loading &&
-              rows.map((r) => (
-                <TableRow key={r.productId}>
-                  <TableCell>{r.productName}</TableCell>
-                  <TableCell className="font-mono text-muted-foreground">
-                    {r.sku}
-                  </TableCell>
-                  <TableCell className="text-right font-mono">{r.stock}</TableCell>
-                  <TableCell className="text-right">{r.minStock}</TableCell>
-                  <TableCell>
-                    {r.isLowStock ? (
-                      <Badge variant="destructive">Low stock</Badge>
-                    ) : (
-                      <Badge variant="secondary">OK</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => openAdjust(r)}
-                    >
-                      <SlidersHorizontal className="size-4" />
-                      Adjust
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            {!loading && rows.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground">
-                  No products. Add products, then receive stock on Purchases.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
+      <Input
+        placeholder="Search products (name or SKU)…"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        className="max-w-sm"
+      />
 
-      {meta && meta.totalPages > 1 && (
-        <Pagination meta={meta} onPageChange={setPage} />
+      {isManufacturer && (
+        <div className="flex flex-wrap gap-2">
+          {KIND_FILTERS.map((f) => (
+            <Button
+              key={f.id}
+              type="button"
+              variant={kindFilter === f.id ? "default" : "outline"}
+              size="sm"
+              onClick={() => setKindFilter(f.id)}
+            >
+              {f.label}
+            </Button>
+          ))}
+        </div>
       )}
+
+      {(expiryLoading || expiryAlerts.length > 0) && (
+        <Card className="border-chart-3/30">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <AlertTriangle className="size-4 text-chart-3" />
+              Batch expiry alerts
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {expiryLoading && (
+              <p className="text-sm text-muted-foreground">Checking batches…</p>
+            )}
+            {!expiryLoading && expiryAlerts.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                No batches expiring within 30 days.
+              </p>
+            )}
+            {!expiryLoading && expiryAlerts.length > 0 && (
+              <ul className="divide-y rounded-lg border border-border/60">
+                {expiryAlerts.map((row) => (
+                  <li
+                    key={row._id}
+                    className="flex flex-wrap items-center justify-between gap-3 px-3 py-2.5 text-sm"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-medium">{row.productName}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Batch {row.batchNumber} · {row.sku} ·{" "}
+                        {formatQuantityWithUnit(row.remainingQuantity, row.unitId)}{" "}
+                        on hand
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-mono text-xs tabular-nums text-muted-foreground">
+                        {formatDateYmd(row.expiryDate)}
+                      </span>
+                      <Badge
+                        variant={
+                          row.level === "critical" ? "destructive" : "outline"
+                        }
+                        className="gap-1"
+                      >
+                        {row.level === "critical" ? (
+                          <CalendarX className="size-3" />
+                        ) : (
+                          <AlertTriangle className="size-3" />
+                        )}
+                        {row.level === "critical" ? "Expired" : "Expiring soon"}
+                      </Badge>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 gap-1"
+                        disabled={writeOffBatchId === row._id}
+                        onClick={() => void handleWriteOff(row)}
+                      >
+                        <Trash2 className="size-3.5" />
+                        {writeOffBatchId === row._id ? "Writing off…" : "Write off"}
+                      </Button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      <DataTable
+        columns={[
+          {
+            id: "product",
+            header: "Product",
+            sortKey: "name",
+            cell: (r) => r.productName,
+          },
+          {
+            id: "sku",
+            header: "SKU",
+            sortKey: "sku",
+            cell: (r) => (
+              <span className="font-mono text-muted-foreground">{r.sku}</span>
+            ),
+          },
+          ...(isManufacturer
+            ? [
+                {
+                  id: "kind",
+                  header: "Kind",
+                  cell: (r: StockSummary) => (
+                    <Badge
+                      variant={r.productKind === "RAW" ? "secondary" : "default"}
+                    >
+                      {r.productKind === "RAW" ? "Raw" : "Finished"}
+                    </Badge>
+                  ),
+                },
+              ]
+            : []),
+          {
+            id: "stock",
+            header: "Stock",
+            headerClassName: "text-right",
+            className: "text-right font-mono",
+            cell: (r) => formatQuantityWithUnit(r.stock, r.unitId),
+          },
+          {
+            id: "min",
+            header: "Min",
+            sortKey: "minStock",
+            headerClassName: "text-right",
+            className: "text-right",
+            cell: (r) => formatQuantityWithUnit(r.minStock, r.unitId),
+          },
+          {
+            id: "status",
+            header: "Status",
+            cell: (r) =>
+              r.isLowStock ? (
+                <Badge variant="destructive">Low stock</Badge>
+              ) : (
+                <Badge variant="secondary">OK</Badge>
+              ),
+          },
+          {
+            id: "actions",
+            header: "Actions",
+            headerClassName: "text-right",
+            className: "text-right",
+            cell: (r) => (
+              <Button variant="ghost" size="sm" onClick={() => openAdjust(r)}>
+                <SlidersHorizontal className="size-4" />
+                Adjust
+              </Button>
+            ),
+          },
+        ]}
+        data={rows}
+        rowKey={(r) => r.productId}
+        loading={loading}
+        emptyMessage="No products. Add products, then receive stock on Purchases."
+        meta={meta}
+        onPageChange={setPage}
+        sort={sort}
+        dir={dir}
+        onSortChange={handleSort}
+      />
 
       <Sheet open={adjustOpen} onOpenChange={setAdjustOpen}>
         <SheetContent>
@@ -214,7 +426,7 @@ export default function InventoryPage() {
               <SheetTitle>Adjust stock</SheetTitle>
               <SheetDescription>
                 {selected
-                  ? `${selected.productName} — current stock: ${selected.stock}`
+                  ? `${selected.productName} — current stock: ${formatQuantityWithUnit(selected.stock, selected.unitId)}`
                   : "Manual correction"}
               </SheetDescription>
             </SheetHeader>

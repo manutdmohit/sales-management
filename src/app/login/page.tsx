@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { LoginForm } from "@/components/auth/login-form";
+import { MAGIC_TOUCH_BRAND } from "@/domain/brand";
 
 import { Toaster } from "@/components/ui/sonner";
 
@@ -12,7 +13,7 @@ export default function LoginPage() {
 
       <div className="relative z-10 w-full max-w-md">
         <p className="auth-stagger-0 mb-6 text-center text-sm font-medium tracking-wide text-muted-foreground uppercase opacity-0">
-          Enterprise Inventory v2
+          {MAGIC_TOUCH_BRAND.name}
         </p>
         <Suspense
           fallback={

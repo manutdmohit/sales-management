@@ -1,11 +1,14 @@
 import { redirect } from "next/navigation";
-import { AppSidebar } from "@/components/layout/app-sidebar";
+import { AppSidebar, MobileNav } from "@/components/layout/app-sidebar";
 import { BusinessSelector } from "@/components/layout/business-selector";
 import { PageTransition } from "@/components/layout/page-transition";
 import { UserMenu } from "@/components/layout/user-menu";
+import { NotificationBell } from "@/components/layout/notification-bell";
 import { BusinessProvider } from "@/lib/business-context";
+import { TableSettingsProvider } from "@/lib/table-settings-context";
 import { AuthProvider } from "@/lib/auth-context";
 import { getSession } from "@/lib/auth/session";
+import { isAdmin } from "@/domain/roles";
 import { ConfirmProvider } from "@/components/ui/confirm-provider";
 import { Toaster } from "@/components/ui/sonner";
 
@@ -23,19 +26,31 @@ export default async function AppLayout({
     <AuthProvider>
       <ConfirmProvider>
       <BusinessProvider>
+        <TableSettingsProvider>
         <div className="flex min-h-screen">
           <AppSidebar />
-          <div className="flex flex-1 flex-col">
-            <header className="flex h-14 items-center justify-between gap-4 border-b px-6">
-              <BusinessSelector />
-              <UserMenu />
+          <div className="flex min-h-screen min-w-0 flex-1 flex-col">
+            <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-1 border-b border-border/60 bg-background/70 px-3 backdrop-blur-xl sm:h-16 sm:gap-2 sm:px-4 lg:gap-4 lg:px-6">
+              <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden sm:gap-2">
+                <MobileNav />
+                <div className="min-w-0 flex-1">
+                  <BusinessSelector />
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+                {isAdmin(session.role) && <NotificationBell />}
+                <UserMenu initialRole={session.role} />
+              </div>
             </header>
-            <main className="flex-1 overflow-auto p-6">
-              <PageTransition>{children}</PageTransition>
+            <main className="app-shell-bg min-h-0 flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
+              <div className="mx-auto w-full max-w-7xl">
+                <PageTransition>{children}</PageTransition>
+              </div>
             </main>
           </div>
         </div>
         <Toaster />
+        </TableSettingsProvider>
       </BusinessProvider>
       </ConfirmProvider>
     </AuthProvider>

@@ -5,9 +5,17 @@ import {
   ensureProtectedApi,
   parsePaginationParams,
   parseQueryBusinessId,
+  parseSortParams,
 } from "@/lib/api";
 import { jsonListResponse } from "@/lib/paginated-response";
 import { toErrorResponse, AppError } from "@/lib/errors";
+
+const PRODUCT_SORT_FIELDS = [
+  "name",
+  "sku",
+  "pricing.selling",
+  "minStock",
+] as const;
 
 export async function GET(request: Request) {
   try {
@@ -19,10 +27,26 @@ export async function GET(request: Request) {
     }
     const search = searchParams.get("search") ?? undefined;
     const includeInactive = searchParams.get("all") === "true";
+    const productKindParam = searchParams.get("productKind");
+    const productKind =
+      productKindParam === "RAW" || productKindParam === "FINISHED"
+        ? productKindParam
+        : undefined;
+    const categoryId = searchParams.get("categoryId") ?? undefined;
+    const uncategorized = searchParams.get("uncategorized") === "true";
+    const { sort, dir } = parseSortParams(searchParams, PRODUCT_SORT_FIELDS, {
+      sort: "name",
+      dir: "asc",
+    });
     const pagination = parsePaginationParams(searchParams);
     const products = await productService.list(businessId, {
       search,
       includeInactive,
+      productKind,
+      categoryId,
+      uncategorized,
+      sort,
+      dir,
       ...(pagination && {
         page: pagination.page,
         pageSize: pagination.pageSize,

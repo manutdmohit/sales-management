@@ -5,9 +5,12 @@ import {
   ensureProtectedApi,
   parsePaginationParams,
   parseQueryBusinessId,
+  parseSortParams,
 } from "@/lib/api";
 import { jsonListResponse } from "@/lib/paginated-response";
 import { toErrorResponse, AppError } from "@/lib/errors";
+
+const PURCHASE_SORT_FIELDS = ["createdAt", "supplierName", "total"] as const;
 
 export async function GET(request: Request) {
   try {
@@ -17,8 +20,16 @@ export async function GET(request: Request) {
     if (!businessId) {
       throw new AppError("businessId query parameter is required", 400);
     }
+    const search = searchParams.get("search") ?? undefined;
+    const { sort, dir } = parseSortParams(searchParams, PURCHASE_SORT_FIELDS, {
+      sort: "createdAt",
+      dir: "desc",
+    });
     const pagination = parsePaginationParams(searchParams);
     const purchases = await purchaseService.list(businessId, {
+      search,
+      sort,
+      dir,
       ...(pagination && {
         page: pagination.page,
         pageSize: pagination.pageSize,

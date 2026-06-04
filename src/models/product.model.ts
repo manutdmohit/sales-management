@@ -1,10 +1,23 @@
 import { Schema, model, models } from "mongoose";
 import { BUSINESS_TYPES } from "@/domain/business-types";
 
+const productKinds = ["RAW", "FINISHED"] as const;
+
 const productPricingSchema = new Schema(
   {
     purchase: { type: Number, required: true },
     selling: { type: Number, required: true },
+    unitCost: Number,
+  },
+  { _id: false }
+);
+
+const recipeLineSchema = new Schema(
+  {
+    rawProductId: { type: String, required: true },
+    rawProductName: String,
+    rawUnitId: String,
+    quantityPerUnit: { type: Number, required: true },
   },
   { _id: false }
 );
@@ -18,6 +31,13 @@ const productSchema = new Schema(
       enum: BUSINESS_TYPES,
       index: true,
     },
+    productKind: {
+      type: String,
+      required: true,
+      enum: productKinds,
+      default: "FINISHED",
+      index: true,
+    },
     categoryId: String,
     name: { type: String, required: true },
     slug: { type: String, required: true },
@@ -26,6 +46,7 @@ const productSchema = new Schema(
     pricing: { type: productPricingSchema, required: true },
     trackExpiry: { type: Boolean, default: false },
     minStock: { type: Number, default: 0 },
+    recipe: { type: [recipeLineSchema], default: undefined },
     isActive: { type: Boolean, default: true },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },

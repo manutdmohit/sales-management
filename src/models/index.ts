@@ -4,3 +4,8 @@ export { InventoryTransactionModel } from "./inventory-transaction.model";
 export { BatchModel } from "./batch.model";
 export { SaleModel } from "./sale.model";
 export { PurchaseModel } from "./purchase.model";
+export { ServiceModel } from "./service.model";
+export { AppointmentModel } from "./appointment.model";
+export { NotificationModel } from "./notification.model";
+export { ClientModel } from "./client.model";
+export { SupplierModel } from "./supplier.model";

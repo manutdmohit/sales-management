@@ -51,8 +51,12 @@ export const businessService = {
   },
 
   async update(id: string, input: UpdateBusinessInput): Promise<Business> {
-    await this.getById(id);
-    const business = await businessRepository.update(id, input);
+    const existing = await this.getById(id);
+    const patch: UpdateBusinessInput = { ...input };
+    if (input.settings) {
+      patch.settings = { ...existing.settings, ...input.settings };
+    }
+    const business = await businessRepository.update(id, patch);
     if (!business) throw new AppError("Business not found", 404, "NOT_FOUND");
     if (input.type) {
       await productRepository.syncBusinessType(id, input.type);

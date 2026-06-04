@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getSessionFromRequest } from "@/lib/auth/session";
+import {
+  canAccessApi,
+  canAccessPage,
+  staffHomePath,
+} from "@/domain/roles";
 
 /** Only these paths are reachable without a session. */
 function isPublicRoute(request: NextRequest): boolean {
@@ -19,6 +24,13 @@ function isPublicRoute(request: NextRequest): boolean {
     return true;
   }
 
+  if (
+    pathname === "/api/cron/reminders" &&
+    (method === "GET" || method === "POST")
+  ) {
+    return true;
+  }
+
   return false;
 }
 
@@ -29,7 +41,9 @@ export async function middleware(request: NextRequest) {
 
   if (pathname === "/login") {
     if (isAuthenticated) {
-      return NextResponse.redirect(new URL("/", request.url));
+      const home =
+        session!.role === "STAFF" ? staffHomePath() : "/";
+      return NextResponse.redirect(new URL(home, request.url));
     }
     return NextResponse.next();
   }
@@ -47,15 +61,21 @@ export async function middleware(request: NextRequest) {
     }
   }
 
+  if (session) {
+    if (pathname.startsWith("/api/")) {
+      if (!canAccessApi(session.role, pathname, request.method)) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+    } else if (!canAccessPage(session.role, pathname)) {
+      return NextResponse.redirect(new URL(staffHomePath(), request.url));
+    }
+  }
+
   return NextResponse.next();
 }
 
 export const config = {
   matcher: [
-    /*
-     * Match all routes except static assets.
-     * Every page and API must pass through auth unless whitelisted above.
-     */
     "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };

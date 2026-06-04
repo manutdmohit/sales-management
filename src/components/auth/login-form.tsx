@@ -2,8 +2,11 @@
 
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Loader2, Lock, Mail, Package } from "lucide-react";
+import { Loader2, Lock, Mail } from "lucide-react";
+import { MAGIC_TOUCH_BRAND } from "@/domain/brand";
+import { BusinessLogo } from "@/components/layout/business-logo";
 import { toast } from "sonner";
+import { staffHomePath } from "@/domain/roles";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -38,9 +41,16 @@ export function LoginForm() {
       }
       setSuccessPulse(true);
       toast.success(`Welcome back, ${json.data.user.name}`);
-      const from = searchParams.get("from") || "/";
+      const role = json.data.user.role as string | undefined;
+      const from = searchParams.get("from");
+      let target = from || "/";
+      if (role === "STAFF") {
+        const allowed =
+          from?.startsWith("/pos") || from?.startsWith("/bookings");
+        target = allowed && from ? from : staffHomePath();
+      }
       setTimeout(() => {
-        router.push(from);
+        router.push(target);
         router.refresh();
       }, 450);
     } catch (err) {
@@ -56,12 +66,17 @@ export function LoginForm() {
       }`}
     >
       <CardHeader className="auth-stagger-1 space-y-3 text-center opacity-0">
-        <div className="mx-auto flex size-12 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-md">
-          <Package className="size-6" />
+        <div className="mx-auto">
+          <BusinessLogo
+            logoUrl={MAGIC_TOUCH_BRAND.logoUrl}
+            name={MAGIC_TOUCH_BRAND.name}
+            size="lg"
+            className="mx-auto"
+          />
         </div>
-        <CardTitle className="text-2xl">Sign in</CardTitle>
-        <CardDescription>
-          Inventory Platform — manage stock, sales, and reports
+        <CardTitle className="text-2xl">{MAGIC_TOUCH_BRAND.name}</CardTitle>
+        <CardDescription className="text-balance">
+          {MAGIC_TOUCH_BRAND.address}
         </CardDescription>
       </CardHeader>
       <CardContent className="auth-stagger-2 opacity-0">
@@ -115,8 +130,11 @@ export function LoginForm() {
           </Button>
         </form>
         <p className="auth-stagger-3 mt-4 text-center text-xs text-muted-foreground opacity-0">
-          Default admin: <code className="text-foreground">admin@inventory.local</code>{" "}
-          / <code className="text-foreground">admin123</code>
+          Admin: <code className="text-foreground">admin@inventory.local</code> /{" "}
+          <code className="text-foreground">admin123</code>
+          <br />
+          Staff: <code className="text-foreground">staff@inventory.local</code> /{" "}
+          <code className="text-foreground">staff123</code>
         </p>
       </CardContent>
     </Card>

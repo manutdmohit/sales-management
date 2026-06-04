@@ -1,20 +1,98 @@
-export type ReportPeriod = "daily" | "weekly" | "monthly" | "custom";
+import { formatDateYmd, formatMonthYmd } from "@/lib/format-datetime";
+
+export type ReportPeriod = "daily" | "weekly" | "monthly" | "yearly" | "custom";
+
+/** Human-readable labels for preset report ranges (not custom). */
+export const REPORT_PERIOD_OPTIONS = [
+  { id: "daily", label: "Last 30 days", shortLabel: "last 30 days" },
+  { id: "weekly", label: "Last 12 weeks", shortLabel: "last 12 weeks" },
+  { id: "monthly", label: "Last 12 months", shortLabel: "last 12 months" },
+  { id: "yearly", label: "Last 5 years", shortLabel: "last 5 years" },
+] as const satisfies ReadonlyArray<{
+  id: Exclude<ReportPeriod, "custom">;
+  label: string;
+  shortLabel: string;
+}>;
+
+export function reportPeriodLabel(period: ReportPeriod): string {
+  if (period === "custom") return "Custom range";
+  return (
+    REPORT_PERIOD_OPTIONS.find((option) => option.id === period)?.label ?? period
+  );
+}
+
+export function reportPeriodBreakdownHint(period: ReportPeriod): string {
+  switch (period) {
+    case "daily":
+      return "by day";
+    case "weekly":
+      return "by week";
+    case "monthly":
+      return "by month";
+    case "yearly":
+      return "by year";
+    default:
+      return "";
+  }
+}
+
+export type ReportLineDetail = {
+  productName: string;
+  quantity: number;
+  lineTotal: number;
+  lineCost?: number;
+  /** Customer name for sales, supplier name for purchases. */
+  partyName: string;
+};
 
 export type ReportBucket = {
   label: string;
   date: string;
   count: number;
   total: number;
+  revenue?: number;
+  cost?: number;
+  /** Product sales subtotal in bucket (profit reports). */
+  productRevenue?: number;
+  /** Service booking revenue in bucket (profit reports). */
+  serviceRevenue?: number;
+  productCount?: number;
+  serviceCount?: number;
+  details: ReportLineDetail[];
+};
+
+export type PaymentMethodBreakdown = {
+  method: "CASH" | "ONLINE";
+  amount: number;
+  count: number;
 };
 
 export type ReportResult = {
-  kind: "sales" | "purchases";
+  kind:
+    | "sales"
+    | "purchases"
+    | "services"
+    | "production"
+    | "rawConsumption"
+    | "profit";
   period: ReportPeriod;
   from: string;
   to: string;
   buckets: ReportBucket[];
   totalCount: number;
   totalAmount: number;
+  /** Combined revenue in range (profit reports). */
+  totalRevenue?: number;
+  /** Product sales subtotal in range (profit reports). */
+  productRevenue?: number;
+  /** Service booking revenue in range (profit reports). */
+  serviceRevenue?: number;
+  /** COGS in range (profit reports). */
+  totalCost?: number;
+  /** Cash vs Online collected in range (sales reports only). */
+  paymentBreakdown?: PaymentMethodBreakdown[];
+  /** Total amount actually collected in range across all methods. */
+  totalCollected?: number;
 };
 
 function startOfDay(d: Date): Date {
@@ -59,6 +137,12 @@ export function resolveReportRange(
     return { from: startOfDay(from), to };
   }
 
+  if (period === "yearly") {
+    from.setFullYear(from.getFullYear() - 4);
+    from.setMonth(0, 1);
+    return { from: startOfDay(from), to };
+  }
+
   from.setMonth(from.getMonth() - 11);
   from.setDate(1);
   return { from: startOfDay(from), to };
@@ -70,6 +154,7 @@ export function bucketKeyForDate(date: Date, period: ReportPeriod): string {
   const d = String(date.getDate()).padStart(2, "0");
 
   if (period === "monthly") return `${y}-${m}`;
+  if (period === "yearly") return `${y}`;
   if (period === "weekly") return isoWeekKey(date);
   return `${y}-${m}-${d}`;
 }
@@ -86,21 +171,18 @@ function isoWeekKey(date: Date): string {
 }
 
 export function bucketLabel(key: string, period: ReportPeriod): string {
+  if (period === "yearly") {
+    return key;
+  }
   if (period === "monthly") {
     const [y, m] = key.split("-");
-    return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString(undefined, {
-      month: "short",
-      year: "numeric",
-    });
+    return formatMonthYmd(Number(y), Number(m));
   }
   if (period === "weekly") {
     return key.replace("-W", " W");
   }
   const [y, m, d] = key.split("-").map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-  });
+  return formatDateYmd(new Date(y, m - 1, d));
 }
 
 export function iterateBucketKeys(
@@ -118,6 +200,9 @@ export function iterateBucketKeys(
     if (period === "monthly") {
       cursor.setMonth(cursor.getMonth() + 1);
       cursor.setDate(1);
+    } else if (period === "yearly") {
+      cursor.setFullYear(cursor.getFullYear() + 1);
+      cursor.setMonth(0, 1);
     } else if (period === "weekly") {
       cursor.setDate(cursor.getDate() + 7);
     } else {
@@ -129,6 +214,7 @@ export function iterateBucketKeys(
 }
 
 export function mongoDateFormat(period: ReportPeriod): string {
+  if (period === "yearly") return "%Y";
   if (period === "monthly") return "%Y-%m";
   if (period === "weekly") return "%G-W%V";
   return "%Y-%m-%d";

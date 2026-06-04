@@ -10,10 +10,13 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 
+import type { UserRole } from "@/domain/roles";
+
 export type AuthUser = {
   _id: string;
   email: string;
   name: string;
+  role: UserRole;
 };
 
 type AuthContextValue = {

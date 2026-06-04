@@ -8,6 +8,8 @@ const inventoryTransactionTypes: InventoryTransactionType[] = [
   "DAMAGE",
   "RETURN",
   "EXPIRED",
+  "PRODUCTION_CONSUME",
+  "PRODUCTION_OUTPUT",
 ];
 
 const inventoryTransactionSchema = new Schema(

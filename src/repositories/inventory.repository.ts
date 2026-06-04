@@ -31,11 +31,16 @@ export const inventoryRepository = {
               $switch: {
                 branches: [
                   {
-                    case: { $in: ["$type", ["PURCHASE", "RETURN"]] },
+                    case: { $in: ["$type", ["PURCHASE", "RETURN", "PRODUCTION_OUTPUT"]] },
                     then: { $abs: "$quantity" },
                   },
                   {
-                    case: { $in: ["$type", ["SALE", "DAMAGE", "EXPIRED"]] },
+                    case: {
+                      $in: [
+                        "$type",
+                        ["SALE", "DAMAGE", "EXPIRED", "PRODUCTION_CONSUME"],
+                      ],
+                    },
                     then: { $multiply: [{ $abs: "$quantity" }, -1] },
                   },
                   {

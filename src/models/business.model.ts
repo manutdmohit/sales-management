@@ -6,6 +6,8 @@ const businessSettingsSchema = new Schema(
     currency: String,
     timezone: String,
     invoicePrefix: String,
+    logoUrl: String,
+    address: String,
   },
   { _id: false }
 );

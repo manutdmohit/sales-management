@@ -26,6 +26,7 @@ export const authService = {
       sub: user._id,
       email: user.email,
       name: user.name,
+      role: user.role,
     };
 
     const token = await createSessionToken(sessionUser);
@@ -41,14 +42,33 @@ export const authService = {
       _id: user._id,
       email: user.email,
       name: user.name,
+      role: user.role,
     };
   },
 
   async ensureAdminUser(email: string, password: string, name: string) {
     const existing = await userRepository.findByEmail(email);
-    if (existing) return existing;
+    if (existing) {
+      if (existing.role !== "ADMIN") {
+        await userRepository.updateRole(existing._id, "ADMIN");
+      }
+      return existing;
+    }
 
     const passwordHash = await bcrypt.hash(password, 12);
-    return userRepository.create({ email, passwordHash, name });
+    return userRepository.create({ email, passwordHash, name, role: "ADMIN" });
+  },
+
+  async ensureStaffUser(email: string, password: string, name: string) {
+    const existing = await userRepository.findByEmail(email);
+    if (existing) {
+      if (existing.role !== "STAFF") {
+        await userRepository.updateRole(existing._id, "STAFF");
+      }
+      return existing;
+    }
+
+    const passwordHash = await bcrypt.hash(password, 12);
+    return userRepository.create({ email, passwordHash, name, role: "STAFF" });
   },
 };

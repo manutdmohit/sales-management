@@ -27,3 +27,9 @@ eventBus.on("PURCHASE_CREATED", async (e) => {
 eventBus.on("STOCK_UPDATED", async (e) => {
   console.info("[event]", e.type, e.businessId, e.payload);
 });
+
+import { registerNotificationHandlers } from "./notification-handlers";
+import { registerEmailHandlers } from "./email-handlers";
+
+registerNotificationHandlers();
+registerEmailHandlers();

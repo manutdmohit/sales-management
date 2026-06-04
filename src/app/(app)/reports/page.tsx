@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactElement,
+} from "react";
 import {
   Bar,
   BarChart,
@@ -14,7 +21,14 @@ import {
   YAxis,
 } from "recharts";
 import { useBusiness } from "@/lib/business-context";
-import type { ReportPeriod, ReportResult } from "@/lib/report-ranges";
+import { hasFeature } from "@/domain/capabilities";
+import { formatQuantity } from "@/lib/format-quantity";
+import { formatDateYmd } from "@/lib/format-datetime";
+import type { ReportPeriod, ReportResult, ReportLineDetail } from "@/lib/report-ranges";
+import {
+  REPORT_PERIOD_OPTIONS,
+  reportPeriodBreakdownHint,
+} from "@/lib/report-ranges";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,13 +43,11 @@ import {
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 
-type ReportKind = "sales" | "purchases";
+type ReportKind = "sales" | "purchases" | "services" | "production" | "rawConsumption" | "profit";
 
-const PERIODS: { id: ReportPeriod; label: string }[] = [
-  { id: "daily", label: "Daily (30d)" },
-  { id: "weekly", label: "Weekly (12w)" },
-  { id: "monthly", label: "Monthly (12m)" },
-  { id: "custom", label: "Custom range" },
+const PERIODS = [
+  ...REPORT_PERIOD_OPTIONS,
+  { id: "custom" as const, label: "Custom range" },
 ];
 
 function defaultCustomFrom() {
@@ -48,9 +60,158 @@ function defaultCustomTo() {
   return new Date().toISOString().slice(0, 10);
 }
 
+type ChartPoint = {
+  name: string;
+  count: number;
+  total: number;
+  details: ReportLineDetail[];
+};
+
+const TOOLTIP_DETAIL_LIMIT = 12;
+
+const CHART_HEIGHT = 288;
+
+/** Mount Recharts only after the container has measurable dimensions. */
+function ReportChartFrame({ children }: { children: ReactElement }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState<{ width: number; height: number } | null>(
+    null
+  );
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const update = () => {
+      const { width, height } = el.getBoundingClientRect();
+      if (width > 0 && height > 0) {
+        setSize({
+          width: Math.floor(width),
+          height: Math.floor(height),
+        });
+      }
+    };
+
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div
+      ref={ref}
+      className="h-72 min-h-72 w-full min-w-0"
+      style={{ minHeight: CHART_HEIGHT }}
+    >
+      {size ? (
+        <ResponsiveContainer width={size.width} height={size.height} minWidth={0}>
+          {children}
+        </ResponsiveContainer>
+      ) : null}
+    </div>
+  );
+}
+
+function ReportChartTooltip({
+  active,
+  payload,
+  label,
+  kind,
+  amountLabel,
+  countLabel,
+  itemLabel = "Product",
+}: {
+  active?: boolean;
+  payload?: { payload: ChartPoint; name?: string; value?: number }[];
+  label?: string;
+  kind: ReportKind;
+  amountLabel: string;
+  countLabel: string;
+  itemLabel?: string;
+}) {
+  if (!active || !payload?.length) return null;
+
+  const point = payload[0].payload;
+  const details = point.details ?? [];
+  const shown = details.slice(0, TOOLTIP_DETAIL_LIMIT);
+  const remaining = details.length - shown.length;
+  const partyLabel =
+    kind === "purchases"
+      ? "Supplier"
+      : kind === "production"
+        ? "Note"
+        : kind === "rawConsumption"
+          ? "Used for"
+          : kind === "profit"
+            ? "Customer"
+            : "Customer";
+  const isMonetary = kind !== "production";
+  const showLineCost = kind === "profit";
+
+  return (
+    <div className="max-w-xs rounded-md border border-border bg-popover px-3 py-2 text-sm shadow-md">
+      <p className="font-medium">{label}</p>
+      <div className="mt-1 space-y-0.5 text-xs text-muted-foreground">
+        {payload.map((entry) => (
+          <p key={String(entry.name)}>
+            <span className="text-foreground">{entry.name}: </span>
+            {typeof entry.value === "number"
+              ? entry.name === amountLabel
+                ? isMonetary
+                  ? entry.value.toFixed(2)
+                  : formatQuantity(entry.value)
+                : entry.value
+              : entry.value}
+          </p>
+        ))}
+      </div>
+      {shown.length > 0 && (
+        <ul className="mt-2 max-h-48 space-y-1 overflow-y-auto border-t border-border/60 pt-2 text-xs">
+          {shown.map((line, index) => (
+            <li key={`${line.productName}-${line.partyName}-${index}`}>
+              <span className="font-medium text-foreground">
+                {line.productName}
+              </span>
+              <span className="text-muted-foreground">
+                {" "}
+                ×{line.quantity}
+              </span>
+              <span className="text-muted-foreground"> → </span>
+              <span>{line.partyName}</span>
+              {isMonetary && (
+                <span className="ml-1 font-mono text-muted-foreground">
+                  ({line.lineTotal.toFixed(2)}
+                  {showLineCost && line.lineCost != null
+                    ? ` / COGS ${line.lineCost.toFixed(2)}`
+                    : ""}
+                  )
+                </span>
+              )}
+            </li>
+          ))}
+          {remaining > 0 && (
+            <li className="text-muted-foreground">+{remaining} more line items</li>
+          )}
+        </ul>
+      )}
+      {shown.length === 0 && point.count > 0 && (
+        <p className="mt-2 border-t border-border/60 pt-2 text-xs text-muted-foreground">
+          No line-item details for this {countLabel.toLowerCase()} period.
+        </p>
+      )}
+      {details.length > 0 && (
+        <p className="mt-1.5 text-[10px] text-muted-foreground">
+          {itemLabel} · {partyLabel} per line
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default function ReportsPage() {
   const { businessId, businesses, loading: businessLoading } = useBusiness();
-  const [kind, setKind] = useState<ReportKind>("sales");
+  const [kind, setKind] = useState<ReportKind>("profit");
   const [period, setPeriod] = useState<ReportPeriod>("daily");
   const [from, setFrom] = useState(defaultCustomFrom);
   const [to, setTo] = useState(defaultCustomTo);
@@ -58,6 +219,22 @@ export default function ReportsPage() {
   const [loading, setLoading] = useState(false);
 
   const selectedBusiness = businesses.find((b) => b._id === businessId);
+  const showServicesReport = hasFeature(selectedBusiness?.type, "services");
+  const showProductionReport = hasFeature(selectedBusiness?.type, "manufacturing");
+
+  useEffect(() => {
+    if (kind === "services" && !showServicesReport) {
+      setKind("profit");
+    }
+    if (kind === "production" && !showProductionReport) {
+      setKind("profit");
+    }
+    if (kind === "rawConsumption" && !showProductionReport) {
+      setKind("profit");
+    }
+  }, [kind, showServicesReport, showProductionReport]);
+
+  const isProfitReport = kind === "profit";
 
   const loadReport = useCallback(async () => {
     if (!businessId) return;
@@ -88,18 +265,78 @@ export default function ReportsPage() {
   const displayReport = businessId ? report : null;
   const displayLoading = Boolean(businessId && loading);
 
-  const chartData = useMemo(
+  const chartData = useMemo<ChartPoint[]>(
     () =>
       displayReport?.buckets.map((b) => ({
         name: b.label,
         count: b.count,
         total: Math.round(b.total * 100) / 100,
+        details: b.details ?? [],
       })) ?? [],
     [displayReport]
   );
 
-  const amountLabel = kind === "sales" ? "Revenue" : "Spend";
-  const countLabel = kind === "sales" ? "Sales" : "Purchases";
+  const breakdownBuckets = useMemo(
+    () => [...(displayReport?.buckets ?? [])].reverse(),
+    [displayReport]
+  );
+
+  const amountLabel =
+    kind === "purchases"
+      ? "Spend"
+      : kind === "production"
+        ? "Units produced"
+        : kind === "rawConsumption"
+          ? "Material cost"
+          : kind === "profit"
+            ? "Profit"
+            : "Revenue";
+  const countLabel =
+    kind === "profit"
+      ? showServicesReport
+        ? "Transactions"
+        : "Sales"
+      : kind === "sales"
+        ? "Sales"
+        : kind === "services"
+          ? "Bookings"
+          : kind === "production"
+            ? "Production runs"
+            : kind === "rawConsumption"
+              ? "Material usages"
+              : "Purchases";
+  const itemLabel =
+    kind === "services"
+      ? "Service"
+      : kind === "production"
+        ? "Finished product"
+        : kind === "rawConsumption"
+          ? "Raw material"
+          : "Product";
+
+  const formatAmountTotal = (value: number) =>
+    kind === "production" ? formatQuantity(value) : value.toFixed(2);
+
+  const paymentSplit = useMemo(() => {
+    const breakdown = displayReport?.paymentBreakdown ?? [];
+    const cash = breakdown.find((b) => b.method === "CASH");
+    const online = breakdown.find((b) => b.method === "ONLINE");
+    const collected = displayReport?.totalCollected ?? 0;
+    const pct = (v: number) => (collected > 0 ? (v / collected) * 100 : 0);
+    return {
+      collected,
+      cash: { amount: cash?.amount ?? 0, count: cash?.count ?? 0 },
+      online: { amount: online?.amount ?? 0, count: online?.count ?? 0 },
+      cashPct: pct(cash?.amount ?? 0),
+      onlinePct: pct(online?.amount ?? 0),
+    };
+  }, [displayReport]);
+
+  const profitBreakdownCols = isProfitReport
+    ? showServicesReport
+      ? 7
+      : 5
+    : 3;
 
   if (businessLoading) {
     return <p className="text-muted-foreground">Loading…</p>;
@@ -122,7 +359,7 @@ export default function ReportsPage() {
       <div>
         <h2 className="text-2xl font-semibold">Reports</h2>
         <p className="text-muted-foreground">
-          Sales and purchase analytics for{" "}
+          Profit from product sales and services, plus operational analytics for{" "}
           <span className="font-medium text-foreground">
             {selectedBusiness?.name}
           </span>
@@ -131,14 +368,29 @@ export default function ReportsPage() {
       </div>
 
       <div className="flex flex-wrap gap-2">
-        {(["sales", "purchases"] as const).map((k) => (
+        {(
+          [
+            { id: "profit" as const, label: "Profit" },
+            { id: "sales" as const, label: "Product sales" },
+            ...(showServicesReport
+              ? [{ id: "services" as const, label: "Service revenue" }]
+              : []),
+            ...(showProductionReport
+              ? [
+                  { id: "production" as const, label: "Production volume" },
+                  { id: "rawConsumption" as const, label: "Raw consumption" },
+                ]
+              : []),
+            { id: "purchases" as const, label: "Purchases" },
+          ] as const
+        ).map((k) => (
           <Button
-            key={k}
-            variant={kind === k ? "default" : "outline"}
+            key={k.id}
+            variant={kind === k.id ? "default" : "outline"}
             size="sm"
-            onClick={() => setKind(k)}
+            onClick={() => setKind(k.id)}
           >
-            {k === "sales" ? "Sales report" : "Purchase report"}
+            {k.label}
           </Button>
         ))}
       </div>
@@ -180,7 +432,117 @@ export default function ReportsPage() {
         </div>
       )}
 
-      <div className="grid gap-4 md:grid-cols-2">
+      {isProfitReport && (
+        <p className="text-sm text-muted-foreground">
+          Profit = product sales revenue − cost of goods sold
+          {showServicesReport ? " + service booking revenue" : ""}. Purchases
+          are inventory investment, not period profit.
+          {displayReport && (
+            <>
+              {" "}
+              Totals cover{" "}
+              {formatDateYmd(displayReport.from)} —{" "}
+              {formatDateYmd(displayReport.to)}
+              {period !== "custom" && reportPeriodBreakdownHint(period)
+                ? ` (chart broken down ${reportPeriodBreakdownHint(period)}).`
+                : "."}
+            </>
+          )}
+        </p>
+      )}
+
+      <div
+        className={cn(
+          "grid gap-4",
+          isProfitReport
+            ? showServicesReport
+              ? "sm:grid-cols-2 xl:grid-cols-5"
+              : "sm:grid-cols-2 xl:grid-cols-4"
+            : "md:grid-cols-2"
+        )}
+      >
+        {isProfitReport ? (
+          <>
+            <Card className="border-primary/25 bg-primary/5 sm:col-span-2 xl:col-span-1">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Total profit
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p
+                  className={cn(
+                    "text-3xl font-semibold font-mono tabular-nums",
+                    !displayLoading &&
+                      (displayReport?.totalAmount ?? 0) < 0 &&
+                      "text-destructive"
+                  )}
+                >
+                  {displayLoading
+                    ? "…"
+                    : (displayReport?.totalAmount ?? 0).toFixed(2)}
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Product revenue
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-semibold font-mono tabular-nums">
+                  {displayLoading
+                    ? "…"
+                    : (displayReport?.productRevenue ?? 0).toFixed(2)}
+                </p>
+              </CardContent>
+            </Card>
+            {showServicesReport && (
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Service revenue
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-3xl font-semibold font-mono tabular-nums">
+                    {displayLoading
+                      ? "…"
+                      : (displayReport?.serviceRevenue ?? 0).toFixed(2)}
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  COGS
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-semibold font-mono tabular-nums">
+                  {displayLoading
+                    ? "…"
+                    : (displayReport?.totalCost ?? 0).toFixed(2)}
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  {showServicesReport ? "Sales + bookings" : "Product sales"}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-semibold tabular-nums">
+                  {displayLoading ? "…" : (displayReport?.totalCount ?? 0)}
+                </p>
+              </CardContent>
+            </Card>
+          </>
+        ) : (
+          <>
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -201,24 +563,107 @@ export default function ReportsPage() {
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-semibold">
-              {displayLoading ? "…" : (displayReport?.totalAmount.toFixed(2) ?? "0.00")}
+              {displayLoading ? "…" : formatAmountTotal(displayReport?.totalAmount ?? 0)}
             </p>
           </CardContent>
         </Card>
+          </>
+        )}
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      {(kind === "sales" || kind === "services") && (
         <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Cash vs Online collected
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">
+              {kind === "sales"
+                ? "Actual payments received in range, including credit settlements."
+                : "Amount collected at booking time (down-payments on credit bookings)."}
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-baseline justify-between">
+              <span className="text-sm text-muted-foreground">
+                Total collected
+              </span>
+              <span className="font-mono text-2xl font-semibold">
+                {displayLoading ? "…" : paymentSplit.collected.toFixed(2)}
+              </span>
+            </div>
+
+            {/* Proportion bar */}
+            <div className="flex h-2.5 overflow-hidden rounded-full bg-muted">
+              <div
+                className="bg-chart-1 transition-all"
+                style={{ width: `${paymentSplit.cashPct}%` }}
+                title={`Cash ${paymentSplit.cashPct.toFixed(0)}%`}
+              />
+              <div
+                className="bg-chart-2 transition-all"
+                style={{ width: `${paymentSplit.onlinePct}%` }}
+                title={`Online ${paymentSplit.onlinePct.toFixed(0)}%`}
+              />
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              {(
+                [
+                  {
+                    label: "Cash",
+                    data: paymentSplit.cash,
+                    pct: paymentSplit.cashPct,
+                    dot: "bg-chart-1",
+                  },
+                  {
+                    label: "Online",
+                    data: paymentSplit.online,
+                    pct: paymentSplit.onlinePct,
+                    dot: "bg-chart-2",
+                  },
+                ] as const
+              ).map(({ label, data, pct, dot }) => (
+                <div
+                  key={label}
+                  className="rounded-lg border border-border/60 bg-card p-3"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className={cn("size-2.5 rounded-full", dot)} />
+                    <span className="text-sm font-medium">{label}</span>
+                    <span className="ml-auto text-xs text-muted-foreground">
+                      {pct.toFixed(0)}%
+                    </span>
+                  </div>
+                  <p className="mt-1 font-mono text-xl font-semibold">
+                    {displayLoading ? "…" : data.amount.toFixed(2)}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {data.count} payment{data.count === 1 ? "" : "s"}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <div className="grid min-w-0 gap-6 lg:grid-cols-2">
+        <Card className="min-w-0">
           <CardHeader>
             <CardTitle>{amountLabel} over time</CardTitle>
           </CardHeader>
-          <CardContent className="h-72">
+          <CardContent>
             {displayLoading ? (
-              <p className="text-sm text-muted-foreground">Loading chart…</p>
+              <div className="flex h-72 items-center justify-center text-sm text-muted-foreground">
+                Loading chart…
+              </div>
             ) : chartData.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No data in range.</p>
+              <div className="flex h-72 items-center justify-center text-sm text-muted-foreground">
+                No data in range.
+              </div>
             ) : (
-              <ResponsiveContainer width="100%" height="100%">
+              <ReportChartFrame>
                 <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                   <XAxis
@@ -228,8 +673,13 @@ export default function ReportsPage() {
                   />
                   <YAxis tick={{ fontSize: 11 }} />
                   <Tooltip
-                    formatter={(value) =>
-                      typeof value === "number" ? value.toFixed(2) : value
+                    content={
+                      <ReportChartTooltip
+                        kind={kind}
+                        amountLabel={amountLabel}
+                        countLabel={countLabel}
+                        itemLabel={itemLabel}
+                      />
                     }
                   />
                   <Legend />
@@ -240,22 +690,26 @@ export default function ReportsPage() {
                     radius={[4, 4, 0, 0]}
                   />
                 </BarChart>
-              </ResponsiveContainer>
+              </ReportChartFrame>
             )}
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="min-w-0">
           <CardHeader>
             <CardTitle>{countLabel} count over time</CardTitle>
           </CardHeader>
-          <CardContent className="h-72">
+          <CardContent>
             {displayLoading ? (
-              <p className="text-sm text-muted-foreground">Loading chart…</p>
+              <div className="flex h-72 items-center justify-center text-sm text-muted-foreground">
+                Loading chart…
+              </div>
             ) : chartData.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No data in range.</p>
+              <div className="flex h-72 items-center justify-center text-sm text-muted-foreground">
+                No data in range.
+              </div>
             ) : (
-              <ResponsiveContainer width="100%" height="100%">
+              <ReportChartFrame>
                 <LineChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                   <XAxis
@@ -264,7 +718,16 @@ export default function ReportsPage() {
                     interval="preserveStartEnd"
                   />
                   <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-                  <Tooltip />
+                  <Tooltip
+                    content={
+                      <ReportChartTooltip
+                        kind={kind}
+                        amountLabel={amountLabel}
+                        countLabel={countLabel}
+                        itemLabel={itemLabel}
+                      />
+                    }
+                  />
                   <Legend />
                   <Line
                     type="monotone"
@@ -275,7 +738,7 @@ export default function ReportsPage() {
                     dot={{ r: 3 }}
                   />
                 </LineChart>
-              </ResponsiveContainer>
+              </ReportChartFrame>
             )}
           </CardContent>
         </Card>
@@ -286,8 +749,8 @@ export default function ReportsPage() {
           <CardTitle>Breakdown</CardTitle>
           {displayReport && (
             <p className="text-sm text-muted-foreground">
-              {new Date(displayReport.from).toLocaleDateString()} —{" "}
-              {new Date(displayReport.to).toLocaleDateString()}
+              {formatDateYmd(displayReport.from)} —{" "}
+              {formatDateYmd(displayReport.to)}
             </p>
           )}
         </CardHeader>
@@ -297,35 +760,83 @@ export default function ReportsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Period</TableHead>
-                  <TableHead className="text-right">Count</TableHead>
+                  {isProfitReport && showServicesReport ? (
+                    <>
+                      <TableHead className="text-right">Sales</TableHead>
+                      <TableHead className="text-right">Bookings</TableHead>
+                    </>
+                  ) : (
+                    <TableHead className="text-right">Count</TableHead>
+                  )}
+                  {isProfitReport && (
+                    <>
+                      <TableHead className="text-right">Product rev.</TableHead>
+                      {showServicesReport && (
+                        <TableHead className="text-right">Service rev.</TableHead>
+                      )}
+                      <TableHead className="text-right">COGS</TableHead>
+                    </>
+                  )}
                   <TableHead className="text-right">{amountLabel}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading && (
                   <TableRow>
-                    <TableCell colSpan={3} className="text-center text-muted-foreground">
+                    <TableCell
+                      colSpan={profitBreakdownCols}
+                      className="text-center text-muted-foreground"
+                    >
                       Loading…
                     </TableCell>
                   </TableRow>
                 )}
                 {!loading &&
-                  report?.buckets.map((b) => (
+                  breakdownBuckets.map((b) => (
                     <TableRow
                       key={b.date}
                       className={cn(b.count === 0 && "text-muted-foreground")}
                     >
                       <TableCell>{b.label}</TableCell>
-                      <TableCell className="text-right">{b.count}</TableCell>
+                      {isProfitReport && showServicesReport ? (
+                        <>
+                          <TableCell className="text-right">
+                            {b.productCount ?? 0}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {b.serviceCount ?? 0}
+                          </TableCell>
+                        </>
+                      ) : (
+                        <TableCell className="text-right">{b.count}</TableCell>
+                      )}
+                      {isProfitReport && (
+                        <>
+                          <TableCell className="text-right font-mono">
+                            {(b.productRevenue ?? 0).toFixed(2)}
+                          </TableCell>
+                          {showServicesReport && (
+                            <TableCell className="text-right font-mono">
+                              {(b.serviceRevenue ?? 0).toFixed(2)}
+                            </TableCell>
+                          )}
+                          <TableCell className="text-right font-mono">
+                            {(b.cost ?? 0).toFixed(2)}
+                          </TableCell>
+                        </>
+                      )}
                       <TableCell className="text-right font-mono">
-                        {b.total.toFixed(2)}
+                        {formatAmountTotal(b.total)}
                       </TableCell>
                     </TableRow>
                   ))}
-                {!loading && report && report.buckets.length === 0 && (
+                {!loading && displayReport && breakdownBuckets.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={3} className="text-center text-muted-foreground">
-                      No {kind} in this period.
+                    <TableCell
+                      colSpan={profitBreakdownCols}
+                      className="text-center text-muted-foreground"
+                    >
+                      No {countLabel.toLowerCase()} in this period.
                     </TableCell>
                   </TableRow>
                 )}

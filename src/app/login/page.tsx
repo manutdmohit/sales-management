@@ -6,7 +6,7 @@ import { Toaster } from "@/components/ui/sonner";
 
 export default function LoginPage() {
   return (
-    <div className="auth-page-bg relative flex min-h-screen flex-col items-center justify-center overflow-hidden p-6">
+    <div className="auth-page-bg relative flex min-h-dvh flex-col items-center justify-center overflow-hidden p-6">
       <div className="auth-orb auth-orb-1" aria-hidden />
       <div className="auth-orb auth-orb-2" aria-hidden />
       <div className="auth-orb auth-orb-3" aria-hidden />

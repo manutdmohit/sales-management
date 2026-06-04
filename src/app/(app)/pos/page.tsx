@@ -972,7 +972,7 @@ export default function PosPage() {
       {!cartOpen && (
       <div
         className={cn(
-          "fixed inset-x-0 bottom-0 z-40 border-t border-border/60 bg-background/95 p-3 shadow-[0_-4px_24px_rgba(0,0,0,0.08)] backdrop-blur-lg transition-shadow lg:hidden pb-[max(0.75rem,env(safe-area-inset-bottom))]",
+          "fixed inset-x-0 bottom-0 z-40 border-t border-border/60 bg-background p-3 shadow-[0_-4px_24px_rgba(0,0,0,0.08)] transition-shadow lg:hidden pb-[max(0.75rem,env(safe-area-inset-bottom))]",
           cartPulse && "shadow-[0_-4px_32px_rgba(79,70,229,0.35)] ring-2 ring-primary/40"
         )}
       >

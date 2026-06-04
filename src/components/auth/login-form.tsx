@@ -61,7 +61,7 @@ export function LoginForm() {
 
   return (
     <Card
-      className={`auth-card-enter w-full max-w-md border-border/60 bg-card/90 shadow-xl backdrop-blur-sm transition-transform duration-500 ${
+      className={`auth-card-enter w-full max-w-md border-border/60 bg-card shadow-xl transition-transform duration-500 ${
         successPulse ? "scale-[0.98] opacity-90" : ""
       }`}
     >

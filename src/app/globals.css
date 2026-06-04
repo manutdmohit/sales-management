@@ -310,3 +310,32 @@
     opacity: 1;
   }
 }
+
+/*
+ * iOS Safari (incl. iPhone 11): large blurred layers + backdrop-filter on
+ * sticky/fixed UI often exhaust GPU memory and reload the tab.
+ */
+@media (hover: none) and (pointer: coarse) {
+  .auth-orb {
+    display: none;
+  }
+
+  .auth-page-bg {
+    animation: none;
+    background-size: 100% 100%;
+    background-position: 0 0;
+  }
+
+  .auth-card-enter,
+  .auth-stagger-0,
+  .auth-stagger-1,
+  .auth-stagger-2,
+  .auth-stagger-3 {
+    animation: none;
+    opacity: 1;
+  }
+
+  .card-hover:hover {
+    transform: none;
+  }
+}

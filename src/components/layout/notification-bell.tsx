@@ -22,7 +22,22 @@ import { useConfirm } from "@/components/ui/confirm-provider";
 import { cn } from "@/lib/utils";
 import { formatDateTimeYmd } from "@/lib/format-datetime";
 
-const POLL_MS = 5_000;
+const POLL_MS_DESKTOP = 5_000;
+const POLL_MS_TOUCH = 20_000;
+const POLL_MS_HIDDEN = 60_000;
+
+function pollIntervalMs(): number {
+  if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+    return POLL_MS_HIDDEN;
+  }
+  if (
+    typeof window !== "undefined" &&
+    window.matchMedia("(hover: none) and (pointer: coarse)").matches
+  ) {
+    return POLL_MS_TOUCH;
+  }
+  return POLL_MS_DESKTOP;
+}
 
 function iconForType(type: NotificationType) {
   switch (type) {
@@ -153,10 +168,20 @@ export function NotificationBell() {
       if (openRef.current) void refreshList({ silent: true });
     };
 
-    const intervalId = window.setInterval(tick, POLL_MS);
+    let intervalId = window.setInterval(tick, pollIntervalMs());
+
+    const resetInterval = () => {
+      window.clearInterval(intervalId);
+      intervalId = window.setInterval(tick, pollIntervalMs());
+    };
+
     const onChanged = () => tick();
-    const onFocus = () => tick();
+    const onFocus = () => {
+      tick();
+      resetInterval();
+    };
     const onVisibilityChange = () => {
+      resetInterval();
       if (document.visibilityState === "visible") tick();
     };
 

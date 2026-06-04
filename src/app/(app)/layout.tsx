@@ -27,10 +27,10 @@ export default async function AppLayout({
       <ConfirmProvider>
       <BusinessProvider>
         <TableSettingsProvider>
-        <div className="flex min-h-screen">
+        <div className="flex min-h-dvh">
           <AppSidebar />
-          <div className="flex min-h-screen min-w-0 flex-1 flex-col">
-            <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-1 border-b border-border/60 bg-background/70 px-3 backdrop-blur-xl sm:h-16 sm:gap-2 sm:px-4 lg:gap-4 lg:px-6">
+          <div className="flex min-h-dvh min-w-0 flex-1 flex-col">
+            <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-1 border-b border-border/60 bg-background px-3 sm:h-16 sm:gap-2 sm:px-4 lg:gap-4 lg:px-6 lg:bg-background/70 lg:backdrop-blur-xl">
               <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden sm:gap-2">
                 <MobileNav />
                 <div className="min-w-0 flex-1">

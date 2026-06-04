@@ -642,7 +642,7 @@ export default function ManufacturingPage() {
               </div>
             </div>
 
-            <SheetFooter className="mt-0 flex-row justify-end gap-2 border-t border-border/60 bg-background/95 px-4 py-4 backdrop-blur-sm">
+            <SheetFooter className="mt-0 flex-row justify-end gap-2 border-t border-border/60 bg-background px-4 py-4">
               <Button
                 type="button"
                 variant="outline"

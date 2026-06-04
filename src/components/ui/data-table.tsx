@@ -28,9 +28,11 @@ export type DataTableColumn<T> = {
   mobilePrimary?: boolean;
   /** Footer actions on auto-generated mobile cards. Empty headers are treated as actions. */
   mobileActions?: boolean;
-  /** Omit from auto-generated mobile cards. */
+  /** Omit from compact mobile column sets (row cards still show every field). */
   hideOnMobile?: boolean;
 };
+
+type MobileLayout = "rows" | "table" | "cards";
 
 type DataTableProps<T> = {
   columns: DataTableColumn<T>[];
@@ -47,8 +49,8 @@ type DataTableProps<T> = {
   onSortChange?: (key: string, dir: SortDir) => void;
   /** Fully custom mobile card; when omitted, cards are built from column metadata. */
   renderMobileCard?: (row: T) => ReactNode;
-  /** Mobile layout: scrollable table (default) or stacked cards. */
-  mobileLayout?: "table" | "cards";
+  /** Mobile layout: row detail cards (default), scrollable table, or custom cards. */
+  mobileLayout?: MobileLayout;
 };
 
 function hasHeader(header: ReactNode): boolean {
@@ -58,28 +60,23 @@ function hasHeader(header: ReactNode): boolean {
 }
 
 function partitionColumns<T>(columns: DataTableColumn<T>[]) {
-  const visible = columns.filter((c) => !c.hideOnMobile);
   const primary =
-    visible.find((c) => c.mobilePrimary) ??
-    visible.find((c) => hasHeader(c.header) && !c.mobileActions);
-  const actions = visible.filter(
+    columns.find((c) => c.mobilePrimary) ??
+    columns.find((c) => hasHeader(c.header) && !c.mobileActions);
+  const actions = columns.filter(
     (c) =>
       c.mobileActions ||
       (!hasHeader(c.header) && c !== primary) ||
       c.id === "actions" ||
       c.id === "add"
   );
-  const details = visible.filter(
+  const details = columns.filter(
     (c) => c !== primary && !actions.includes(c) && hasHeader(c.header)
   );
   return { primary, details, actions };
 }
 
-function getMobileColumns<T>(columns: DataTableColumn<T>[]) {
-  return columns.filter((c) => !c.hideOnMobile || c.mobileActions);
-}
-
-function AutoMobileCard<T>({
+function MobileRowCard<T>({
   row,
   columns,
 }: {
@@ -164,7 +161,7 @@ function TableSection<T>({
 }) {
   return (
     <div className={cn("overflow-x-auto", mobile && "-webkit-overflow-scrolling-touch")}>
-      <Table className={mobile ? "min-w-full text-xs" : undefined}>
+      <Table className={mobile ? "min-w-max text-xs" : undefined}>
         <TableHeader>
           <TableRow>
             {columns.map((col) => {
@@ -240,7 +237,8 @@ function TableSection<T>({
                     key={col.id}
                     className={cn(
                       col.className,
-                      mobile && "max-w-[45vw] whitespace-normal align-top text-xs sm:max-w-none"
+                      mobile &&
+                        "min-w-[5.5rem] max-w-[12rem] whitespace-normal align-top px-2 text-xs"
                     )}
                   >
                     {col.cell(row)}
@@ -267,15 +265,14 @@ export function DataTable<T>({
   dir,
   onSortChange,
   renderMobileCard,
-  mobileLayout = "table",
+  mobileLayout = "rows",
 }: DataTableProps<T>) {
   const { pageSize, setPageSize } = useTableSettings();
   const colSpan = columns.length;
-  const mobileColumns = getMobileColumns(columns);
-  const useMobileCards =
+  const useCustomCards =
     mobileLayout === "cards" && Boolean(renderMobileCard);
 
-  const mobileCardList = (
+  const mobileRowCards = (
     <div className="space-y-3 md:hidden">
       {loading && (
         <p className="py-10 text-center text-sm text-muted-foreground">
@@ -288,17 +285,28 @@ export function DataTable<T>({
         </p>
       )}
       {!loading &&
-        data.map((row) =>
-          renderMobileCard ? (
-            <div key={rowKey(row)}>{renderMobileCard(row)}</div>
-          ) : (
-            <AutoMobileCard
-              key={rowKey(row)}
-              row={row}
-              columns={columns}
-            />
-          )
-        )}
+        data.map((row) => (
+          <MobileRowCard key={rowKey(row)} row={row} columns={columns} />
+        ))}
+    </div>
+  );
+
+  const mobileCustomCards = (
+    <div className="space-y-3 md:hidden">
+      {loading && (
+        <p className="py-10 text-center text-sm text-muted-foreground">
+          Loading…
+        </p>
+      )}
+      {!loading && data.length === 0 && (
+        <p className="py-10 text-center text-sm text-muted-foreground">
+          {emptyMessage}
+        </p>
+      )}
+      {!loading &&
+        data.map((row) => (
+          <div key={rowKey(row)}>{renderMobileCard!(row)}</div>
+        ))}
     </div>
   );
 
@@ -306,12 +314,12 @@ export function DataTable<T>({
     <div className="md:hidden">
       <div className="overflow-hidden rounded-xl border border-border/50 bg-card shadow-sm ring-1 ring-foreground/[0.03]">
         <TableSection
-          columns={mobileColumns}
+          columns={columns}
           data={data}
           rowKey={rowKey}
           loading={loading}
           emptyMessage={emptyMessage}
-          colSpan={mobileColumns.length}
+          colSpan={colSpan}
           sort={sort}
           dir={dir}
           onSortChange={onSortChange}
@@ -321,6 +329,13 @@ export function DataTable<T>({
     </div>
   );
 
+  const mobileView =
+    useCustomCards
+      ? mobileCustomCards
+      : mobileLayout === "table"
+        ? mobileTable
+        : mobileRowCards;
+
   return (
     <div
       className={cn(
@@ -328,7 +343,7 @@ export function DataTable<T>({
         className
       )}
     >
-      {useMobileCards ? mobileCardList : mobileTable}
+      {mobileView}
       <div className="hidden md:block">
         <TableSection
           columns={columns}

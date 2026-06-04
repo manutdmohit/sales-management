@@ -744,20 +744,6 @@ export default function ProductsPage() {
         sort={sort}
         dir={dir}
         onSortChange={handleSort}
-        mobileLayout="cards"
-        renderMobileCard={(p) => (
-          <ProductMobileCard
-            product={p}
-            categoryName={
-              p.categoryId
-                ? categoryById.get(p.categoryId)?.name
-                : undefined
-            }
-            isManufacturer={isManufacturer}
-            onEdit={openEdit}
-            onToggleActive={toggleActive}
-          />
-        )}
       />
 
       <Sheet open={mode !== null} onOpenChange={(open) => !open && closeSheet()}>

@@ -270,71 +270,7 @@ export function DataTable<T>({
   const { pageSize, setPageSize } = useTableSettings();
   const colSpan = columns.length;
   const useCustomCards =
-    mobileLayout === "cards" && Boolean(renderMobileCard);
-
-  const mobileRowCards = (
-    <div className="space-y-3 md:hidden">
-      {loading && (
-        <p className="py-10 text-center text-sm text-muted-foreground">
-          Loading…
-        </p>
-      )}
-      {!loading && data.length === 0 && (
-        <p className="py-10 text-center text-sm text-muted-foreground">
-          {emptyMessage}
-        </p>
-      )}
-      {!loading &&
-        data.map((row) => (
-          <MobileRowCard key={rowKey(row)} row={row} columns={columns} />
-        ))}
-    </div>
-  );
-
-  const mobileCustomCards = (
-    <div className="space-y-3 md:hidden">
-      {loading && (
-        <p className="py-10 text-center text-sm text-muted-foreground">
-          Loading…
-        </p>
-      )}
-      {!loading && data.length === 0 && (
-        <p className="py-10 text-center text-sm text-muted-foreground">
-          {emptyMessage}
-        </p>
-      )}
-      {!loading &&
-        data.map((row) => (
-          <div key={rowKey(row)}>{renderMobileCard!(row)}</div>
-        ))}
-    </div>
-  );
-
-  const mobileTable = (
-    <div className="md:hidden">
-      <div className="overflow-hidden rounded-xl border border-border/50 bg-card shadow-sm ring-1 ring-foreground/[0.03]">
-        <TableSection
-          columns={columns}
-          data={data}
-          rowKey={rowKey}
-          loading={loading}
-          emptyMessage={emptyMessage}
-          colSpan={colSpan}
-          sort={sort}
-          dir={dir}
-          onSortChange={onSortChange}
-          mobile
-        />
-      </div>
-    </div>
-  );
-
-  const mobileView =
-    useCustomCards
-      ? mobileCustomCards
-      : mobileLayout === "table"
-        ? mobileTable
-        : mobileRowCards;
+    mobileLayout === "cards" && typeof renderMobileCard === "function";
 
   return (
     <div
@@ -343,7 +279,58 @@ export function DataTable<T>({
         className
       )}
     >
-      {mobileView}
+      {useCustomCards ? (
+        <div className="space-y-3 md:hidden">
+          {loading && (
+            <p className="py-10 text-center text-sm text-muted-foreground">
+              Loading…
+            </p>
+          )}
+          {!loading && data.length === 0 && (
+            <p className="py-10 text-center text-sm text-muted-foreground">
+              {emptyMessage}
+            </p>
+          )}
+          {!loading &&
+            data.map((row) => (
+              <div key={rowKey(row)}>{renderMobileCard(row)}</div>
+            ))}
+        </div>
+      ) : mobileLayout === "table" ? (
+        <div className="md:hidden">
+          <div className="overflow-hidden rounded-xl border border-border/50 bg-card shadow-sm ring-1 ring-foreground/[0.03]">
+            <TableSection
+              columns={columns}
+              data={data}
+              rowKey={rowKey}
+              loading={loading}
+              emptyMessage={emptyMessage}
+              colSpan={colSpan}
+              sort={sort}
+              dir={dir}
+              onSortChange={onSortChange}
+              mobile
+            />
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-3 md:hidden">
+          {loading && (
+            <p className="py-10 text-center text-sm text-muted-foreground">
+              Loading…
+            </p>
+          )}
+          {!loading && data.length === 0 && (
+            <p className="py-10 text-center text-sm text-muted-foreground">
+              {emptyMessage}
+            </p>
+          )}
+          {!loading &&
+            data.map((row) => (
+              <MobileRowCard key={rowKey(row)} row={row} columns={columns} />
+            ))}
+        </div>
+      )}
       <div className="hidden md:block">
         <TableSection
           columns={columns}

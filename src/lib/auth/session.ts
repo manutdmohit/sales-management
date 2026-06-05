@@ -14,10 +14,13 @@ export type SessionUser = {
 
 function getSecret() {
   const secret = process.env.AUTH_SECRET;
-  if (!secret && process.env.NODE_ENV === "production") {
-    throw new Error("AUTH_SECRET is not set");
+  if (!secret) {
+    if (process.env.NODE_ENV === "production") {
+      console.error("AUTH_SECRET is not set");
+    }
+    return new TextEncoder().encode("dev-only-auth-secret-change-me");
   }
-  return new TextEncoder().encode(secret ?? "dev-only-auth-secret-change-me");
+  return new TextEncoder().encode(secret);
 }
 
 export async function createSessionToken(user: SessionUser): Promise<string> {

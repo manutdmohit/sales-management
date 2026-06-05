@@ -24,7 +24,6 @@ export function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [successPulse, setSuccessPulse] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -39,7 +38,6 @@ export function LoginForm() {
       if (!res.ok) {
         throw new Error(json.error ?? "Login failed");
       }
-      setSuccessPulse(true);
       toast.success(`Welcome back, ${json.data.user.name}`);
       const role = json.data.user.role as string | undefined;
       const from = searchParams.get("from");
@@ -60,18 +58,15 @@ export function LoginForm() {
   }
 
   return (
-    <Card
-      className={`auth-card-enter w-full max-w-md border-border/60 bg-card shadow-xl transition-transform duration-500 ${
-        successPulse ? "scale-[0.98] opacity-90" : ""
-      }`}
-    >
-      <CardHeader className="auth-stagger-1 space-y-3 text-center opacity-0">
+    <Card className="w-full max-w-md border-border/60 bg-card shadow-lg">
+      <CardHeader className="space-y-3 text-center">
         <div className="mx-auto">
           <BusinessLogo
             logoUrl={MAGIC_TOUCH_BRAND.logoUrl}
             name={MAGIC_TOUCH_BRAND.name}
             size="lg"
             className="mx-auto"
+            unoptimized
           />
         </div>
         <CardTitle className="text-2xl">{MAGIC_TOUCH_BRAND.name}</CardTitle>
@@ -79,7 +74,7 @@ export function LoginForm() {
           {MAGIC_TOUCH_BRAND.address}
         </CardDescription>
       </CardHeader>
-      <CardContent className="auth-stagger-2 opacity-0">
+      <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
@@ -116,7 +111,7 @@ export function LoginForm() {
           </div>
           <Button
             type="submit"
-            className="w-full transition-all duration-300 hover:scale-[1.01] active:scale-[0.99]"
+            className="w-full"
             disabled={loading}
           >
             {loading ? (
@@ -129,7 +124,7 @@ export function LoginForm() {
             )}
           </Button>
         </form>
-        <p className="auth-stagger-3 mt-4 text-center text-xs text-muted-foreground opacity-0">
+        <p className="mt-4 text-center text-xs text-muted-foreground">
           Admin: <code className="text-foreground">admin@inventory.local</code> /{" "}
           <code className="text-foreground">admin123</code>
           <br />

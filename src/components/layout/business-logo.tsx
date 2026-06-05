@@ -7,6 +7,7 @@ type BusinessLogoProps = {
   name: string;
   size?: "sm" | "md" | "lg";
   className?: string;
+  unoptimized?: boolean;
 };
 
 const sizeClasses = {
@@ -26,6 +27,7 @@ export function BusinessLogo({
   name,
   size = "md",
   className,
+  unoptimized = false,
 }: BusinessLogoProps) {
   const box = sizeClasses[size];
 
@@ -44,6 +46,7 @@ export function BusinessLogo({
           fill
           className="object-contain p-0.5"
           sizes={size === "lg" ? "48px" : size === "md" ? "36px" : "32px"}
+          unoptimized={unoptimized}
         />
       </div>
     );

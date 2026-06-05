@@ -424,14 +424,20 @@ export default function AppointmentsPage() {
             id: "customer",
             header: "Customer",
             sortKey: "customerName",
-            hideOnMobile: true,
+            mobileWrap: true,
             cell: (a) => (
-              <div>
-                <div>{a.customerName}</div>
-                <div className="text-xs text-muted-foreground">
-                  {a.customerPhone}
-                  {a.customerEmail ? ` · ${a.customerEmail}` : ""}
-                </div>
+              <div className="min-w-[5.5rem] max-w-[8.5rem]">
+                <div className="truncate font-medium">{a.customerName}</div>
+                {a.customerPhone && (
+                  <div className="truncate text-[11px] text-muted-foreground">
+                    {a.customerPhone}
+                  </div>
+                )}
+                {a.customerEmail && (
+                  <div className="truncate text-[11px] text-muted-foreground">
+                    {a.customerEmail}
+                  </div>
+                )}
               </div>
             ),
           },
@@ -779,6 +785,22 @@ export default function AppointmentsPage() {
             <div className="space-y-5 px-4 pb-6">
               <div className="rounded-xl border border-border/60 bg-muted/30 p-4 text-sm">
                 <dl className="space-y-2">
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-muted-foreground">Customer</dt>
+                    <dd className="text-right">
+                      <div className="font-medium">{viewTarget.customerName}</div>
+                      {viewTarget.customerPhone && (
+                        <div className="text-muted-foreground">
+                          {viewTarget.customerPhone}
+                        </div>
+                      )}
+                      {viewTarget.customerEmail && (
+                        <div className="text-muted-foreground">
+                          {viewTarget.customerEmail}
+                        </div>
+                      )}
+                    </dd>
+                  </div>
                   <div className="flex justify-between gap-4">
                     <dt className="text-muted-foreground">Status</dt>
                     <dd>

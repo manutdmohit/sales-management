@@ -397,20 +397,6 @@ export default function AppointmentsPage() {
       <DataTable
         columns={[
           {
-            id: "when",
-            header: "When",
-            sortKey: "startAt",
-            cell: (a) => {
-              const { date, timeRange } = formatAppointmentSlot(a.startAt, a.endAt);
-              return (
-                <div>
-                  <div className="font-medium">{date}</div>
-                  <div className="text-xs text-muted-foreground">{timeRange}</div>
-                </div>
-              );
-            },
-          },
-          {
             id: "service",
             header: "Service",
             sortKey: "serviceName",
@@ -418,9 +404,27 @@ export default function AppointmentsPage() {
             cell: (a) => <span className="font-medium">{a.serviceName}</span>,
           },
           {
+            id: "when",
+            header: "When",
+            sortKey: "startAt",
+            mobileWrap: true,
+            cell: (a) => {
+              const { date, timeRange } = formatAppointmentSlot(a.startAt, a.endAt);
+              return (
+                <span className="block max-w-[7.5rem] truncate" title={`${date} ${timeRange}`}>
+                  <span className="font-medium">{date}</span>
+                  <span className="block truncate text-[11px] text-muted-foreground">
+                    {timeRange}
+                  </span>
+                </span>
+              );
+            },
+          },
+          {
             id: "customer",
             header: "Customer",
             sortKey: "customerName",
+            hideOnMobile: true,
             cell: (a) => (
               <div>
                 <div>{a.customerName}</div>

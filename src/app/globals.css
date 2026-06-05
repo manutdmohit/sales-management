@@ -49,6 +49,42 @@
 }
 
 :root {
+  --background: #fcfcfd;
+  --foreground: #1e1e2e;
+  --card: #ffffff;
+  --card-foreground: #1e1e2e;
+  --popover: #ffffff;
+  --popover-foreground: #1e1e2e;
+  --primary: #4f46e5;
+  --primary-foreground: #fafafa;
+  --secondary: #f4f4f5;
+  --secondary-foreground: #3f3f46;
+  --muted: #f4f4f5;
+  --muted-foreground: #71717a;
+  --accent: #eef2ff;
+  --accent-foreground: #4338ca;
+  --destructive: #dc2626;
+  --border: #e4e4e7;
+  --input: #e4e4e7;
+  --ring: #4f46e5;
+  --chart-1: #6366f1;
+  --chart-2: #0ea5e9;
+  --chart-3: #eab308;
+  --chart-4: #ec4899;
+  --chart-5: #22c55e;
+  --radius: 0.75rem;
+  --sidebar: #1e1e2e;
+  --sidebar-foreground: #e4e4e7;
+  --sidebar-primary: #6366f1;
+  --sidebar-primary-foreground: #fcfcfd;
+  --sidebar-accent: #3f3f46;
+  --sidebar-accent-foreground: #fafafa;
+  --sidebar-border: rgba(255, 255, 255, 0.09);
+  --sidebar-ring: #6366f1;
+}
+
+@supports (color: oklch(0 0 0)) {
+:root {
   --background: oklch(0.991 0.003 264);
   --foreground: oklch(0.21 0.02 266);
   --card: oklch(1 0 0);
@@ -83,7 +119,43 @@
   --sidebar-border: oklch(1 0 0 / 9%);
   --sidebar-ring: oklch(0.62 0.2 266);
 }
+}
 
+.dark {
+  --background: #141418;
+  --foreground: #f4f4f5;
+  --card: #1c1c22;
+  --card-foreground: #f4f4f5;
+  --popover: #1c1c22;
+  --popover-foreground: #f4f4f5;
+  --primary: #6366f1;
+  --primary-foreground: #fcfcfd;
+  --secondary: #27272a;
+  --secondary-foreground: #f4f4f5;
+  --muted: #27272a;
+  --muted-foreground: #a1a1aa;
+  --accent: #312e81;
+  --accent-foreground: #e0e7ff;
+  --destructive: #f87171;
+  --border: rgba(255, 255, 255, 0.1);
+  --input: rgba(255, 255, 255, 0.15);
+  --ring: #6366f1;
+  --chart-1: #818cf8;
+  --chart-2: #38bdf8;
+  --chart-3: #facc15;
+  --chart-4: #f472b6;
+  --chart-5: #4ade80;
+  --sidebar: #18181b;
+  --sidebar-foreground: #f4f4f5;
+  --sidebar-primary: #6366f1;
+  --sidebar-primary-foreground: #fcfcfd;
+  --sidebar-accent: #312e81;
+  --sidebar-accent-foreground: #e0e7ff;
+  --sidebar-border: rgba(255, 255, 255, 0.1);
+  --sidebar-ring: #6366f1;
+}
+
+@supports (color: oklch(0 0 0)) {
 .dark {
   --background: oklch(0.165 0.012 266);
   --foreground: oklch(0.97 0.004 264);
@@ -116,6 +188,7 @@
   --sidebar-accent-foreground: oklch(0.92 0.02 266);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.62 0.2 266);
+}
 }
 
 @layer base {

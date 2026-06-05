@@ -36,17 +36,14 @@ function isPublicRoute(request: NextRequest): boolean {
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const session = await getSessionFromRequest(request);
-  const isAuthenticated = Boolean(session);
 
+  // Keep login lightweight — no session/crypto work on this path (iOS Safari stability).
   if (pathname === "/login") {
-    if (isAuthenticated) {
-      const home =
-        session!.role === "STAFF" ? staffHomePath() : "/";
-      return NextResponse.redirect(new URL(home, request.url));
-    }
     return NextResponse.next();
   }
+
+  const session = await getSessionFromRequest(request);
+  const isAuthenticated = Boolean(session);
 
   if (!isAuthenticated) {
     if (!isPublicRoute(request)) {

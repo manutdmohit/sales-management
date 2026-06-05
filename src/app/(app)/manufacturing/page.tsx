@@ -45,6 +45,11 @@ function defaultProductionExpiryInput(): string {
   return d.toISOString().slice(0, 10);
 }
 
+function formatMoney(value: unknown): string {
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(n) ? n.toFixed(2) : "—";
+}
+
 export default function ManufacturingPage() {
   const { businessId, businesses, loading: businessLoading } = useBusiness();
   const [open, setOpen] = useState(false);
@@ -85,6 +90,7 @@ export default function ManufacturingPage() {
     meta,
     setPage,
     loading,
+    error: listError,
     reload,
   } = usePaginatedList<ProductionRun>(buildUrl, [
     businessId,
@@ -96,26 +102,30 @@ export default function ManufacturingPage() {
 
   const loadCatalog = useCallback(async () => {
     if (!businessId) return;
-    const [productsRes, rawRes, inventoryRes] = await Promise.all([
-      fetch(
-        `/api/products?businessId=${businessId}&productKind=FINISHED&all=true`
-      ),
-      fetch(`/api/products?businessId=${businessId}&productKind=RAW&all=true`),
-      fetch(`/api/inventory?businessId=${businessId}`),
-    ]);
-    const productsJson = await productsRes.json();
-    const rawJson = await rawRes.json();
-    const inventoryJson = await inventoryRes.json();
-    const withRecipe = (productsJson.data ?? []).filter(
-      (p: Product) => p.recipe && p.recipe.length > 0
-    );
-    setFinishedProducts(withRecipe);
-    setRawProducts(rawJson.data ?? []);
-    const map = new Map<string, number>();
-    for (const row of inventoryJson.data ?? []) {
-      map.set(row.productId, row.stock);
+    try {
+      const [productsRes, rawRes, inventoryRes] = await Promise.all([
+        fetch(
+          `/api/products?businessId=${businessId}&productKind=FINISHED&all=true`
+        ),
+        fetch(`/api/products?businessId=${businessId}&productKind=RAW&all=true`),
+        fetch(`/api/inventory?businessId=${businessId}`),
+      ]);
+      const productsJson = await productsRes.json();
+      const rawJson = await rawRes.json();
+      const inventoryJson = await inventoryRes.json();
+      const withRecipe = (productsJson.data ?? []).filter(
+        (p: Product) => p.recipe && p.recipe.length > 0
+      );
+      setFinishedProducts(withRecipe);
+      setRawProducts(rawJson.data ?? []);
+      const map = new Map<string, number>();
+      for (const row of inventoryJson.data ?? []) {
+        map.set(row.productId, row.stock);
+      }
+      setStockMap(map);
+    } catch {
+      toast.error("Could not load product catalog for manufacturing.");
     }
-    setStockMap(map);
   }, [businessId]);
 
   useEffect(() => {
@@ -286,8 +296,7 @@ export default function ManufacturingPage() {
         header: "Material cost",
         headerClassName: "text-right",
         className: "text-right font-mono",
-        cell: (r: ProductionRun) =>
-          r.totalMaterialCost != null ? r.totalMaterialCost.toFixed(2) : "—",
+        cell: (r: ProductionRun) => formatMoney(r.totalMaterialCost),
       },
       {
         id: "unitCost",
@@ -295,8 +304,7 @@ export default function ManufacturingPage() {
         hideOnMobile: true,
         headerClassName: "text-right",
         className: "text-right font-mono text-muted-foreground",
-        cell: (r: ProductionRun) =>
-          r.unitMaterialCost != null ? r.unitMaterialCost.toFixed(2) : "—",
+        cell: (r: ProductionRun) => formatMoney(r.unitMaterialCost),
       },
       {
         id: "recipe",
@@ -312,7 +320,7 @@ export default function ManufacturingPage() {
                   unitId: line.rawUnitId,
                   cost: line.lineCost,
                 }))
-              : r.recipeSnapshot.map((line) => ({
+              : (r.recipeSnapshot ?? []).map((line) => ({
                   key: line.rawProductId,
                   name: line.rawProductName ?? "Material",
                   qty: line.quantityPerUnit * r.quantityProduced,
@@ -325,7 +333,7 @@ export default function ManufacturingPage() {
                 <li key={line.key}>
                   {line.name} × {formatQuantityWithUnit(line.qty, line.unitId)}
                   {line.cost != null && (
-                    <span className="ml-1 font-mono">({line.cost.toFixed(2)})</span>
+                    <span className="ml-1 font-mono">({formatMoney(line.cost)})</span>
                   )}
                 </li>
               ))}
@@ -414,6 +422,22 @@ export default function ManufacturingPage() {
           onPageReset={() => setPage(1)}
         />
       </MobileFilterPanel>
+
+      {listError && (
+        <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm">
+          <p className="font-medium text-destructive">Could not load production runs</p>
+          <p className="mt-1 text-muted-foreground">{listError}</p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="mt-3"
+            onClick={() => void reload()}
+          >
+            Retry
+          </Button>
+        </div>
+      )}
 
       <DataTable<ProductionRun>
         columns={columns}
@@ -569,7 +593,7 @@ export default function ManufacturingPage() {
                               {formatQuantityWithUnit(row.available, row.rawUnitId)}
                             </td>
                             <td className="px-3 py-2.5 text-right font-mono tabular-nums">
-                              {row.lineCost.toFixed(2)}
+                              {formatMoney(row.lineCost)}
                             </td>
                             <td className="px-3 py-2.5 text-right">
                               {row.ok ? (
@@ -596,10 +620,10 @@ export default function ManufacturingPage() {
                       </span>
                       <div className="text-right">
                         <p className="font-mono text-base font-semibold tabular-nums">
-                          {estimatedMaterialCost.toFixed(2)}
+                          {formatMoney(estimatedMaterialCost)}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {estimatedUnitCost.toFixed(2)} per finished unit
+                          {formatMoney(estimatedUnitCost)} per finished unit
                           {selectedFinished?.unitId
                             ? ` (${getUnitSymbol(selectedFinished.unitId)})`
                             : ""}

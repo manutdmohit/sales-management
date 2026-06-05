@@ -14,6 +14,7 @@ export function usePaginatedList<T>(
   const [items, setItems] = useState<T[]>([]);
   const [meta, setMeta] = useState<PaginationMeta | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const enabled = buildUrl(1, pageSize) !== null;
 
@@ -22,11 +23,19 @@ export function usePaginatedList<T>(
     if (!url) {
       setItems([]);
       setMeta(null);
+      setError(null);
       return;
     }
-    const { items: nextItems, meta: nextMeta } = await fetchList<T>(url);
-    setItems(nextItems);
-    setMeta(nextMeta);
+    try {
+      const { items: nextItems, meta: nextMeta } = await fetchList<T>(url);
+      setItems(nextItems);
+      setMeta(nextMeta);
+      setError(null);
+    } catch (err) {
+      setItems([]);
+      setMeta(null);
+      setError(err instanceof Error ? err.message : "Request failed");
+    }
   }, [buildUrl, page, pageSize]);
 
   useEffect(() => {
@@ -53,6 +62,7 @@ export function usePaginatedList<T>(
     setPage,
     pageSize,
     loading: loading || settingsLoading,
+    error,
     reload: load,
     enabled,
   };

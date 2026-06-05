@@ -9,6 +9,34 @@ import {
 } from "@/lib/pagination";
 import { ProductionRunModel } from "@/models/production-run.model";
 
+function toFiniteNumber(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return undefined;
+}
+
+function normalizeProductionRun(doc: { _id: unknown } & Record<string, unknown>): ProductionRun {
+  const run = mapId(doc) as unknown as ProductionRun;
+  return {
+    ...run,
+    quantityProduced: toFiniteNumber(run.quantityProduced) ?? 0,
+    recipeSnapshot: Array.isArray(run.recipeSnapshot) ? run.recipeSnapshot : [],
+    materialsSnapshot: Array.isArray(run.materialsSnapshot)
+      ? run.materialsSnapshot.map((line) => ({
+          ...line,
+          quantityConsumed: toFiniteNumber(line.quantityConsumed) ?? 0,
+          unitCost: toFiniteNumber(line.unitCost) ?? 0,
+          lineCost: toFiniteNumber(line.lineCost) ?? 0,
+        }))
+      : [],
+    totalMaterialCost: toFiniteNumber(run.totalMaterialCost),
+    unitMaterialCost: toFiniteNumber(run.unitMaterialCost),
+  };
+}
+
 export const productionRunRepository = {
   async findByBusinessPaginated(
     businessId: string,
@@ -37,7 +65,9 @@ export const productionRunRepository = {
         .lean(),
       ProductionRunModel.countDocuments(filter),
     ]);
-    const items = docs.map((doc) => mapId(doc) as ProductionRun);
+    const items = docs.map((doc) =>
+      normalizeProductionRun(doc as { _id: unknown } & Record<string, unknown>)
+    );
     return buildPaginatedResult(items, total, options.page, options.pageSize);
   },
 
@@ -45,7 +75,9 @@ export const productionRunRepository = {
     data: Omit<ProductionRun, "_id">
   ): Promise<ProductionRun> {
     const doc = await ProductionRunModel.create(data);
-    return mapId(doc.toObject()) as ProductionRun;
+    return normalizeProductionRun(
+      doc.toObject() as { _id: unknown } & Record<string, unknown>
+    );
   },
 
   async findForReportDetails(

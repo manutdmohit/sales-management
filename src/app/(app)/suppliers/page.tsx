@@ -15,11 +15,6 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/ui/data-table";
 import {
-  MobileCardFooter,
-  MobileCardHeader,
-  MobileCardShell,
-} from "@/components/ui/mobile-card";
-import {
   ListPageHeader,
   MobileFilterPanel,
   MobileSearchField,
@@ -237,7 +232,6 @@ export default function SuppliersPage() {
             id: "phone",
             header: "Phone",
             sortKey: "phone",
-            hideOnMobile: true,
             cell: (s: Supplier) => s.phone ?? "—",
           },
           {
@@ -250,7 +244,6 @@ export default function SuppliersPage() {
           {
             id: "status",
             header: "Status",
-            hideOnMobile: true,
             cell: (s: Supplier) =>
               s.isActive ? (
                 <Badge variant="secondary">Active</Badge>
@@ -305,39 +298,6 @@ export default function SuppliersPage() {
         dir={dir}
         onSortChange={handleSort}
         emptyMessage="No suppliers yet. Add one before receiving stock."
-        renderMobileCard={(s) => (
-          <MobileCardShell>
-            <MobileCardHeader
-              title={
-                <Link href={`/suppliers/${s._id}`} className="hover:text-primary">
-                  {s.name}
-                </Link>
-              }
-              subtitle={[s.contactPerson, s.phone, s.email].filter(Boolean).join(" · ")}
-              badge={
-                <Badge variant={s.isActive ? "secondary" : "outline"}>
-                  {s.isActive ? "Active" : "Inactive"}
-                </Badge>
-              }
-            />
-            <MobileCardFooter>
-              <ButtonLink href={`/suppliers/${s._id}`} variant="outline" size="sm" className="h-9">
-                <Eye className="size-3.5" />
-                View
-              </ButtonLink>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-9"
-                onClick={() => openEdit(s)}
-              >
-                <Pencil className="size-3.5" />
-                Edit
-              </Button>
-            </MobileCardFooter>
-          </MobileCardShell>
-        )}
       />
 
       <Sheet open={formOpen} onOpenChange={setFormOpen}>

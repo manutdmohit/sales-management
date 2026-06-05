@@ -34,12 +34,6 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/ui/data-table";
 import {
-  MobileCardFooter,
-  MobileCardHeader,
-  MobileCardMetrics,
-  MobileCardShell,
-} from "@/components/ui/mobile-card";
-import {
   ListPageHeader,
   MobileFilterPanel,
   MobileSearchField,
@@ -306,6 +300,9 @@ export default function AppointmentsPage() {
       return;
     }
     toast.success(`Marked ${STATUS_LABELS[status].toLowerCase()}`);
+    if (viewTarget?._id === appointment._id && json.data) {
+      setViewTarget(json.data as Appointment);
+    }
     await reload();
   }
 
@@ -403,7 +400,6 @@ export default function AppointmentsPage() {
             id: "when",
             header: "When",
             sortKey: "startAt",
-            hideOnMobile: true,
             cell: (a) => {
               const { date, timeRange } = formatAppointmentSlot(a.startAt, a.endAt);
               return (
@@ -425,7 +421,6 @@ export default function AppointmentsPage() {
             id: "customer",
             header: "Customer",
             sortKey: "customerName",
-            hideOnMobile: true,
             cell: (a) => (
               <div>
                 <div>{a.customerName}</div>
@@ -449,7 +444,6 @@ export default function AppointmentsPage() {
             id: "price",
             header: "Price",
             sortKey: "price",
-            hideOnMobile: true,
             headerClassName: "text-right",
             className: "text-right font-mono",
             cell: (a) => a.price.toFixed(2),
@@ -473,7 +467,6 @@ export default function AppointmentsPage() {
             id: "status",
             header: "Status",
             sortKey: "status",
-            hideOnMobile: true,
             cell: (a) => (
               <Badge variant={statusVariant(a.status)}>
                 {STATUS_LABELS[a.status]}
@@ -482,52 +475,54 @@ export default function AppointmentsPage() {
           },
           {
             id: "actions",
-            header: "Actions",
+            header: "",
             mobileActions: true,
             headerClassName: "text-right",
             className: "text-right",
             cell: (a) => (
-              <div className="flex flex-wrap justify-end gap-1">
+              <div className="flex flex-nowrap justify-end gap-0.5">
                 <Button variant="ghost" size="sm" onClick={() => openView(a)}>
                   View
                 </Button>
                 <Button variant="outline" size="sm" onClick={() => openEdit(a)}>
                   Edit
                 </Button>
-                {a.status === "BOOKED" && (
-                  <>
+                <div className="hidden md:contents">
+                  {a.status === "BOOKED" && (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setStatus(a, "COMPLETED")}
+                      >
+                        Complete
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setStatus(a, "NO_SHOW")}
+                      >
+                        No show
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleCancel(a)}
+                      >
+                        Cancel
+                      </Button>
+                    </>
+                  )}
+                  {(a.status === "CANCELLED" || a.status === "NO_SHOW") && (
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setStatus(a, "COMPLETED")}
+                      onClick={() => setStatus(a, "BOOKED")}
                     >
-                      Complete
+                      Reopen
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setStatus(a, "NO_SHOW")}
-                    >
-                      No show
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleCancel(a)}
-                    >
-                      Cancel
-                    </Button>
-                  </>
-                )}
-                {(a.status === "CANCELLED" || a.status === "NO_SHOW") && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setStatus(a, "BOOKED")}
-                  >
-                    Reopen
-                  </Button>
-                )}
+                  )}
+                </div>
               </div>
             ),
           },
@@ -541,66 +536,6 @@ export default function AppointmentsPage() {
         sort={sort}
         dir={dir}
         onSortChange={handleSort}
-        renderMobileCard={(a) => {
-          const { date, timeRange } = formatAppointmentSlot(a.startAt, a.endAt);
-          return (
-            <MobileCardShell>
-              <MobileCardHeader
-                title={a.serviceName}
-                subtitle={`${date} · ${timeRange}`}
-                badge={
-                  <Badge variant={statusVariant(a.status)}>
-                    {STATUS_LABELS[a.status]}
-                  </Badge>
-                }
-              />
-              <MobileCardMetrics
-                items={[
-                  {
-                    label: "Customer",
-                    value: a.customerName,
-                  },
-                  {
-                    label: "Price",
-                    value: a.price.toFixed(2),
-                    highlight: true,
-                  },
-                ]}
-              />
-              <MobileCardFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-9"
-                  onClick={() => openView(a)}
-                >
-                  View
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-9"
-                  onClick={() => openEdit(a)}
-                >
-                  Edit
-                </Button>
-                {a.status === "BOOKED" && (
-                  <Button
-                    type="button"
-                    variant="default"
-                    size="sm"
-                    className="h-9"
-                    onClick={() => setStatus(a, "COMPLETED")}
-                  >
-                    Complete
-                  </Button>
-                )}
-              </MobileCardFooter>
-            </MobileCardShell>
-          );
-        }}
       />
 
       <Sheet open={bookOpen} onOpenChange={setBookOpen}>
@@ -907,6 +842,41 @@ export default function AppointmentsPage() {
                 >
                   Edit
                 </Button>
+                {viewTarget.status === "BOOKED" && (
+                  <>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={() => void setStatus(viewTarget, "COMPLETED")}
+                    >
+                      Complete
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void setStatus(viewTarget, "NO_SHOW")}
+                    >
+                      No show
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => void handleCancel(viewTarget)}
+                    >
+                      Cancel
+                    </Button>
+                  </>
+                )}
+                {(viewTarget.status === "CANCELLED" ||
+                  viewTarget.status === "NO_SHOW") && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void setStatus(viewTarget, "BOOKED")}
+                  >
+                    Reopen
+                  </Button>
+                )}
                 {viewTarget.saleType === "CREDIT" &&
                   viewTarget.creditStatus !== "PAID" && (
                     <ButtonLink href="/receivables" variant="outline" size="sm">

@@ -26,11 +26,6 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
 import {
-  MobileCardHeader,
-  MobileCardMetrics,
-  MobileCardShell,
-} from "@/components/ui/mobile-card";
-import {
   MobileFilterPanel,
   MobileSearchField,
 } from "@/components/ui/mobile-list-toolbar";
@@ -275,7 +270,6 @@ export default function ClientProfilePage() {
               {
                 id: "date",
                 header: "Date",
-                hideOnMobile: true,
                 cell: (p: ClientPurchaseRecord) =>
                   formatDateTimeYmd(p.createdAt),
               },
@@ -292,7 +286,6 @@ export default function ClientProfilePage() {
               {
                 id: "type",
                 header: "Type",
-                hideOnMobile: true,
                 cell: (p: ClientPurchaseRecord) => (
                   <Badge
                     variant={p.saleType === "CREDIT" ? "outline" : "secondary"}
@@ -317,7 +310,6 @@ export default function ClientProfilePage() {
               {
                 id: "total",
                 header: "Total",
-                hideOnMobile: true,
                 headerClassName: "text-right",
                 className: "text-right font-mono font-semibold",
                 cell: (p: ClientPurchaseRecord) => money(p.total),
@@ -337,34 +329,6 @@ export default function ClientProfilePage() {
             meta={purchases.meta}
             onPageChange={purchases.setPage}
             emptyMessage="No purchases match."
-            renderMobileCard={(p) => (
-              <MobileCardShell>
-                <MobileCardHeader
-                  title={p.invoiceNumber}
-                  subtitle={formatDateTimeYmd(p.createdAt)}
-                  badge={
-                    <Badge
-                      variant={p.saleType === "CREDIT" ? "outline" : "secondary"}
-                    >
-                      {p.saleType === "CREDIT" ? "Credit" : "Paid"}
-                    </Badge>
-                  }
-                />
-                <MobileCardMetrics
-                  items={[
-                    {
-                      label: "Total",
-                      value: money(p.total),
-                      highlight: true,
-                    },
-                    {
-                      label: "Due",
-                      value: p.amountDue > 0 ? money(p.amountDue) : "—",
-                    },
-                  ]}
-                />
-              </MobileCardShell>
-            )}
           />
         </div>
       )}
@@ -381,14 +345,12 @@ export default function ClientProfilePage() {
             {
               id: "when",
               header: "When",
-              hideOnMobile: true,
               cell: (b: ClientServiceRecord) =>
                 formatDateTimeYmd(b.startAt),
             },
             {
               id: "status",
               header: "Status",
-              hideOnMobile: true,
               cell: (b: ClientServiceRecord) => (
                 <Badge variant={statusVariant(b.status)}>{b.status}</Badge>
               ),
@@ -396,7 +358,6 @@ export default function ClientProfilePage() {
             {
               id: "price",
               header: "Price",
-              hideOnMobile: true,
               headerClassName: "text-right",
               className: "text-right font-mono font-semibold",
               cell: (b: ClientServiceRecord) => money(b.price),
@@ -416,24 +377,6 @@ export default function ClientProfilePage() {
           meta={bookings.meta}
           onPageChange={bookings.setPage}
           emptyMessage="No bookings yet."
-          renderMobileCard={(b) => (
-            <MobileCardShell>
-              <MobileCardHeader
-                title={b.serviceName}
-                subtitle={formatDateTimeYmd(b.startAt)}
-                badge={<Badge variant={statusVariant(b.status)}>{b.status}</Badge>}
-              />
-              <MobileCardMetrics
-                items={[
-                  {
-                    label: "Price",
-                    value: money(b.price),
-                    highlight: true,
-                  },
-                ]}
-              />
-            </MobileCardShell>
-          )}
         />
       )}
     </div>

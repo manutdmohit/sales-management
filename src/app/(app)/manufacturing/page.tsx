@@ -19,12 +19,6 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/ui/data-table";
 import {
-  MobileCardBody,
-  MobileCardHeader,
-  MobileCardMetrics,
-  MobileCardShell,
-} from "@/components/ui/mobile-card";
-import {
   ListPageHeader,
   MobileFilterPanel,
   MobileSearchField,
@@ -282,7 +276,6 @@ export default function ManufacturingPage() {
       {
         id: "qty",
         header: "Qty produced",
-        hideOnMobile: true,
         headerClassName: "text-right",
         className: "text-right font-mono",
         cell: (r: ProductionRun) =>
@@ -291,7 +284,6 @@ export default function ManufacturingPage() {
       {
         id: "cost",
         header: "Material cost",
-        hideOnMobile: true,
         headerClassName: "text-right",
         className: "text-right font-mono",
         cell: (r: ProductionRun) =>
@@ -437,56 +429,6 @@ export default function ManufacturingPage() {
           setDir(nextDir);
         }}
         emptyMessage="No production runs yet."
-        renderMobileCard={(r) => {
-          const lines =
-            r.materialsSnapshot && r.materialsSnapshot.length > 0
-              ? r.materialsSnapshot.map((line) => ({
-                  name: line.rawProductName ?? "Material",
-                  qty: line.quantityConsumed,
-                  unitId: line.rawUnitId,
-                }))
-              : r.recipeSnapshot.map((line) => ({
-                  name: line.rawProductName ?? "Material",
-                  qty: line.quantityPerUnit * r.quantityProduced,
-                  unitId: line.rawUnitId,
-                }));
-          return (
-            <MobileCardShell>
-              <MobileCardHeader
-                title={r.finishedProductName}
-                subtitle={formatDateTimeYmd(r.createdAt)}
-              />
-              <MobileCardMetrics
-                items={[
-                  {
-                    label: "Produced",
-                    value: formatQuantityWithUnit(
-                      r.quantityProduced,
-                      r.finishedUnitId
-                    ),
-                    highlight: true,
-                  },
-                  {
-                    label: "Material cost",
-                    value:
-                      r.totalMaterialCost != null
-                        ? r.totalMaterialCost.toFixed(2)
-                        : "—",
-                  },
-                ]}
-              />
-              {lines.length > 0 && (
-                <MobileCardBody className="text-xs">
-                  {lines
-                    .map((line) =>
-                      `${line.name} × ${formatQuantityWithUnit(line.qty, line.unitId)}`
-                    )
-                    .join(", ")}
-                </MobileCardBody>
-              )}
-            </MobileCardShell>
-          );
-        }}
       />
 
       <Sheet open={open} onOpenChange={setOpen}>

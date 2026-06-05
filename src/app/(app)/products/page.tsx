@@ -116,121 +116,6 @@ function ProductRowActions({
   );
 }
 
-function ProductMobileCard({
-  product,
-  categoryName,
-  isManufacturer,
-  onEdit,
-  onToggleActive,
-}: {
-  product: Product;
-  categoryName?: string;
-  isManufacturer: boolean;
-  onEdit: (p: Product) => void;
-  onToggleActive: (p: Product) => void;
-}) {
-  const cost = product.pricing.unitCost ?? product.pricing.purchase;
-  const margin = product.pricing.selling - cost;
-  const marginPct =
-    product.pricing.selling > 0
-      ? ((product.pricing.selling - cost) / product.pricing.selling) * 100
-      : 0;
-
-  const meta = [
-    categoryName,
-    product.sku,
-    getUnitSymbol(product.unitId),
-  ].filter(Boolean);
-
-  return (
-    <article className="overflow-hidden rounded-2xl border border-border/50 bg-card shadow-sm ring-1 ring-foreground/[0.03]">
-      <div className="flex items-start justify-between gap-3 px-4 pb-3 pt-4">
-        <div className="min-w-0 flex-1">
-          <h3 className="text-base font-semibold leading-snug tracking-tight">
-            {product.name}
-          </h3>
-          {meta.length > 0 && (
-            <p className="mt-1 truncate text-xs text-muted-foreground">
-              {meta.join(" · ")}
-            </p>
-          )}
-          {isManufacturer && (
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              <Badge
-                variant={product.productKind === "RAW" ? "secondary" : "default"}
-                className="text-[10px]"
-              >
-                {product.productKind === "RAW" ? "Raw" : "Finished"}
-              </Badge>
-              {product.trackExpiry && (
-                <Badge variant="outline" className="text-[10px]">
-                  Expiry tracked
-                </Badge>
-              )}
-            </div>
-          )}
-        </div>
-        <Badge
-          variant={product.isActive ? "secondary" : "outline"}
-          className="shrink-0"
-        >
-          {product.isActive ? "Active" : "Inactive"}
-        </Badge>
-      </div>
-
-      <div className="grid grid-cols-2 divide-x divide-border/40 border-y border-border/40 bg-muted/20">
-        <div className="px-4 py-3.5">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Selling
-          </p>
-          <p className="mt-1 font-mono text-2xl font-semibold tabular-nums tracking-tight">
-            {product.pricing.selling.toFixed(2)}
-          </p>
-        </div>
-        <div className="px-4 py-3.5">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Margin
-          </p>
-          <p className="mt-1 font-mono text-xl font-semibold tabular-nums text-chart-2">
-            {product.pricing.selling > 0 ? `${marginPct.toFixed(1)}%` : "—"}
-          </p>
-          <p className="font-mono text-xs tabular-nums text-muted-foreground">
-            {margin.toFixed(2)}
-          </p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3 px-4 py-3 text-xs">
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Purchase
-          </p>
-          <p className="mt-0.5 font-mono font-medium tabular-nums">
-            {product.pricing.purchase.toFixed(2)}
-          </p>
-        </div>
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Min stock
-          </p>
-          <p className="mt-0.5 font-mono font-medium tabular-nums">
-            {formatQuantityWithUnit(product.minStock, product.unitId)}
-          </p>
-        </div>
-      </div>
-
-      <div className="flex items-center justify-end border-t border-border/40 bg-muted/10 px-3 py-2.5">
-        <ProductRowActions
-          product={product}
-          onEdit={onEdit}
-          onToggleActive={onToggleActive}
-          compact
-        />
-      </div>
-    </article>
-  );
-}
-
 export default function ProductsPage() {
   const { businessId, businesses, loading: businessLoading } = useBusiness();
   const { confirm } = useConfirm();
@@ -366,7 +251,6 @@ export default function ProductsPage() {
         id: "sku",
         header: "SKU",
         sortKey: "sku",
-        hideOnMobile: true,
         cell: (p: Product) => (
           <span className="font-mono text-sm">{p.sku}</span>
         ),
@@ -393,7 +277,6 @@ export default function ProductsPage() {
         id: "selling",
         header: "Selling",
         sortKey: "pricing.selling",
-        hideOnMobile: true,
         headerClassName: "text-right",
         className: "text-right font-mono",
         cell: (p: Product) => p.pricing.selling.toFixed(2),
@@ -450,7 +333,6 @@ export default function ProductsPage() {
       {
         id: "status",
         header: "Status",
-        hideOnMobile: true,
         cell: (p: Product) =>
           p.isActive ? (
             <Badge variant="secondary">Active</Badge>

@@ -28,11 +28,11 @@ export type DataTableColumn<T> = {
   mobilePrimary?: boolean;
   /** Footer actions on auto-generated mobile cards. Empty headers are treated as actions. */
   mobileActions?: boolean;
-  /** Omit from compact mobile column sets (row cards still show every field). */
+  /** Hide on mobile table; full table still shown on md+. Row cards show all fields. */
   hideOnMobile?: boolean;
 };
 
-type MobileLayout = "rows" | "table" | "cards";
+type MobileLayout = "table" | "cards" | "rows";
 
 type DataTableProps<T> = {
   columns: DataTableColumn<T>[];
@@ -49,9 +49,15 @@ type DataTableProps<T> = {
   onSortChange?: (key: string, dir: SortDir) => void;
   /** Fully custom mobile card; when omitted, cards are built from column metadata. */
   renderMobileCard?: (row: T) => ReactNode;
-  /** Mobile layout: row detail cards (default), scrollable table, or custom cards. */
+  /** Mobile layout: compact table (default), custom cards, or full detail rows. */
   mobileLayout?: MobileLayout;
 };
+
+function getMobileColumns<T>(columns: DataTableColumn<T>[]) {
+  return columns.filter(
+    (c) => !c.hideOnMobile || c.mobilePrimary || c.mobileActions
+  );
+}
 
 function hasHeader(header: ReactNode): boolean {
   if (header == null) return false;
@@ -147,6 +153,7 @@ function TableSection<T>({
   dir,
   onSortChange,
   mobile = false,
+  stickyFirstColumn = false,
 }: {
   columns: DataTableColumn<T>[];
   data: T[];
@@ -158,21 +165,32 @@ function TableSection<T>({
   dir?: SortDir;
   onSortChange?: (key: string, dir: SortDir) => void;
   mobile?: boolean;
+  stickyFirstColumn?: boolean;
 }) {
   return (
     <div className={cn("overflow-x-auto", mobile && "-webkit-overflow-scrolling-touch")}>
       <Table className={mobile ? "min-w-max text-xs" : undefined}>
         <TableHeader>
-          <TableRow>
-            {columns.map((col) => {
+          <TableRow className={mobile ? "hover:bg-transparent" : undefined}>
+            {columns.map((col, index) => {
               const sortable = Boolean(col.sortKey && onSortChange);
               const active = sortable && sort === col.sortKey;
+              const stickyStart =
+                mobile && stickyFirstColumn && index === 0
+                  ? "sticky left-0 z-10 bg-card shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)]"
+                  : undefined;
+              const stickyEnd =
+                mobile && col.mobileActions
+                  ? "sticky right-0 z-10 bg-card shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.08)]"
+                  : undefined;
               return (
                 <TableHead
                   key={col.id}
                   className={cn(
                     col.headerClassName,
-                    mobile && "whitespace-normal px-2 text-xs"
+                    mobile && "whitespace-nowrap px-2.5 py-2 text-[11px]",
+                    stickyStart,
+                    stickyEnd
                   )}
                 >
                   {sortable ? (
@@ -231,19 +249,33 @@ function TableSection<T>({
           )}
           {!loading &&
             data.map((row) => (
-              <TableRow key={rowKey(row)}>
-                {columns.map((col) => (
+              <TableRow key={rowKey(row)} className={mobile ? "hover:bg-muted/30" : undefined}>
+                {columns.map((col, index) => {
+                  const stickyStart =
+                    mobile && stickyFirstColumn && index === 0
+                      ? "sticky left-0 z-10 bg-card shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)]"
+                      : undefined;
+                  const stickyEnd =
+                    mobile && col.mobileActions
+                      ? "sticky right-0 z-10 bg-card shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.08)]"
+                      : undefined;
+                  return (
                   <TableCell
                     key={col.id}
                     className={cn(
                       col.className,
                       mobile &&
-                        "min-w-[5.5rem] max-w-[12rem] whitespace-normal align-top px-2 text-xs"
+                        (col.mobileActions
+                          ? "w-max min-w-[5.5rem] whitespace-nowrap px-2 py-2 align-middle text-xs [&_.font-mono]:text-[11px] [&>div]:flex [&>div]:flex-nowrap [&>div]:items-center [&>div]:justify-end [&>div]:gap-0.5 [&_button]:h-7 [&_button]:shrink-0 [&_button]:px-1.5 [&_button]:text-[11px]"
+                          : "max-w-[9rem] whitespace-nowrap px-2.5 py-2.5 align-middle text-xs [&_.font-mono]:text-[11px]"),
+                      stickyStart,
+                      stickyEnd
                     )}
                   >
                     {col.cell(row)}
                   </TableCell>
-                ))}
+                  );
+                })}
               </TableRow>
             ))}
         </TableBody>
@@ -265,12 +297,14 @@ export function DataTable<T>({
   dir,
   onSortChange,
   renderMobileCard,
-  mobileLayout = "rows",
+  mobileLayout = "table",
 }: DataTableProps<T>) {
   const { pageSize, setPageSize } = useTableSettings();
   const colSpan = columns.length;
+  const mobileColumns = getMobileColumns(columns);
   const useCustomCards =
     mobileLayout === "cards" && typeof renderMobileCard === "function";
+  const useDetailRows = mobileLayout === "rows";
 
   return (
     <div
@@ -296,24 +330,7 @@ export function DataTable<T>({
               <div key={rowKey(row)}>{renderMobileCard(row)}</div>
             ))}
         </div>
-      ) : mobileLayout === "table" ? (
-        <div className="md:hidden">
-          <div className="overflow-hidden rounded-xl border border-border/50 bg-card shadow-sm ring-1 ring-foreground/[0.03]">
-            <TableSection
-              columns={columns}
-              data={data}
-              rowKey={rowKey}
-              loading={loading}
-              emptyMessage={emptyMessage}
-              colSpan={colSpan}
-              sort={sort}
-              dir={dir}
-              onSortChange={onSortChange}
-              mobile
-            />
-          </div>
-        </div>
-      ) : (
+      ) : useDetailRows ? (
         <div className="space-y-3 md:hidden">
           {loading && (
             <p className="py-10 text-center text-sm text-muted-foreground">
@@ -329,6 +346,29 @@ export function DataTable<T>({
             data.map((row) => (
               <MobileRowCard key={rowKey(row)} row={row} columns={columns} />
             ))}
+        </div>
+      ) : (
+        <div className="space-y-1.5 md:hidden">
+          {mobileColumns.length > 3 && (
+            <p className="px-0.5 text-[11px] text-muted-foreground">
+              Swipe horizontally for more columns →
+            </p>
+          )}
+          <div className="overflow-hidden rounded-xl border border-border/50 bg-card shadow-sm ring-1 ring-foreground/[0.03]">
+            <TableSection
+              columns={mobileColumns}
+              data={data}
+              rowKey={rowKey}
+              loading={loading}
+              emptyMessage={emptyMessage}
+              colSpan={mobileColumns.length || 1}
+              sort={sort}
+              dir={dir}
+              onSortChange={onSortChange}
+              mobile
+              stickyFirstColumn
+            />
+          </div>
         </div>
       )}
       <div className="hidden md:block">

@@ -19,12 +19,6 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/ui/data-table";
 import {
-  MobileCardFooter,
-  MobileCardHeader,
-  MobileCardMetrics,
-  MobileCardShell,
-} from "@/components/ui/mobile-card";
-import {
   ListPageHeader,
   MobileFilterPanel,
   MobileSearchField,
@@ -269,7 +263,6 @@ export default function ReceivablesPage() {
             id: "customer",
             header: "Customer",
             sortKey: "customer.name",
-            hideOnMobile: true,
             cell: (r) => (
               <div>
                 <div className="font-medium">{r.customerName}</div>
@@ -318,7 +311,6 @@ export default function ReceivablesPage() {
             id: "dueAmt",
             header: "Outstanding",
             sortKey: "amountDue",
-            hideOnMobile: true,
             headerClassName: "text-right",
             className: "text-right font-mono font-semibold",
             cell: (r) => r.amountDue.toFixed(2),
@@ -326,7 +318,6 @@ export default function ReceivablesPage() {
           {
             id: "status",
             header: "Status",
-            hideOnMobile: true,
             cell: (r) => statusBadge(r),
           },
           {
@@ -367,44 +358,6 @@ export default function ReceivablesPage() {
         sort={sort}
         dir={dir}
         onSortChange={handleSort}
-        renderMobileCard={(r) => (
-          <MobileCardShell>
-            <MobileCardHeader
-              title={r.reference}
-              subtitle={[r.customerName, r.customerPhone].filter(Boolean).join(" · ")}
-              badge={
-                <div className="flex flex-col items-end gap-1">
-                  {sourceBadge(r.source)}
-                  {statusBadge(r)}
-                </div>
-              }
-            />
-            <MobileCardMetrics
-              items={[
-                {
-                  label: "Outstanding",
-                  value: r.amountDue.toFixed(2),
-                  highlight: true,
-                },
-                {
-                  label: "Due",
-                  value: r.dueDate ? formatDateYmd(r.dueDate) : "—",
-                },
-              ]}
-            />
-            <MobileCardFooter>
-              <Button
-                type="button"
-                variant={r.amountDue > 0 ? "default" : "outline"}
-                size="sm"
-                className="h-9"
-                onClick={() => openPayment(r)}
-              >
-                {r.amountDue > 0 ? "Record payment" : "View"}
-              </Button>
-            </MobileCardFooter>
-          </MobileCardShell>
-        )}
       />
 
       <Sheet open={active !== null} onOpenChange={(open) => !open && setActive(null)}>

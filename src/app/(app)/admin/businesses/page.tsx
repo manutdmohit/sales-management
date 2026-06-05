@@ -26,11 +26,6 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/ui/data-table";
 import {
-  MobileCardFooter,
-  MobileCardHeader,
-  MobileCardShell,
-} from "@/components/ui/mobile-card";
-import {
   ListPageHeader,
 } from "@/components/ui/mobile-list-toolbar";
 import {
@@ -284,7 +279,6 @@ export default function AdminBusinessesPage() {
           {
             id: "type",
             header: "Type",
-            hideOnMobile: true,
             cell: (b) => (
               <Badge variant="outline">{businessTypeLabel(b.type)}</Badge>
             ),
@@ -298,7 +292,6 @@ export default function AdminBusinessesPage() {
           {
             id: "status",
             header: "Status",
-            hideOnMobile: true,
             cell: (b) =>
               b.isActive ? (
                 <Badge variant="secondary">Active</Badge>
@@ -347,41 +340,6 @@ export default function AdminBusinessesPage() {
         }
         meta={meta}
         onPageChange={setPage}
-        renderMobileCard={(b) => (
-          <MobileCardShell>
-            <MobileCardHeader
-              title={b.name}
-              subtitle={`${businessTypeLabel(b.type)} · ${b.code}`}
-              badge={
-                <Badge variant={b.isActive ? "secondary" : "outline"}>
-                  {b.isActive ? "Active" : "Inactive"}
-                </Badge>
-              }
-            />
-            <MobileCardFooter>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-9"
-                onClick={() => openEdit(b)}
-              >
-                <Pencil className="size-3.5" />
-                Edit
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-9"
-                onClick={() => toggleActive(b)}
-              >
-                <Trash2 className="size-3.5" />
-                {b.isActive ? "Deactivate" : "Activate"}
-              </Button>
-            </MobileCardFooter>
-          </MobileCardShell>
-        )}
       />
 
       <Sheet open={mode !== null} onOpenChange={(open) => !open && closeSheet()}>

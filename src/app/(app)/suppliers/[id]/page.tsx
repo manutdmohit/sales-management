@@ -19,11 +19,6 @@ import { ButtonLink } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
-import {
-  MobileCardHeader,
-  MobileCardMetrics,
-  MobileCardShell,
-} from "@/components/ui/mobile-card";
 import { ReceiptCell } from "@/components/receipts/payment-receipts";
 
 function money(n: number): string {
@@ -193,7 +188,6 @@ export default function SupplierProfilePage() {
             {
               id: "date",
               header: "Date",
-              hideOnMobile: true,
               cell: (p) => formatDateYmd(p.createdAt),
             },
             {
@@ -212,7 +206,6 @@ export default function SupplierProfilePage() {
             {
               id: "total",
               header: "Total",
-              hideOnMobile: true,
               headerClassName: "text-right",
               className: "text-right font-mono",
               cell: (p) => p.total.toFixed(2),
@@ -230,27 +223,6 @@ export default function SupplierProfilePage() {
           emptyMessage="No purchases from this supplier yet."
           meta={purchases.meta}
           onPageChange={purchases.setPage}
-          renderMobileCard={(p) => (
-            <MobileCardShell>
-              <MobileCardHeader
-                title={formatDateYmd(p.createdAt)}
-                subtitle={p.referenceNumber ?? "No reference"}
-              />
-              <MobileCardMetrics
-                items={[
-                  {
-                    label: "Total",
-                    value: p.total.toFixed(2),
-                    highlight: true,
-                  },
-                  {
-                    label: "Items",
-                    value: p.items.length,
-                  },
-                ]}
-              />
-            </MobileCardShell>
-          )}
         />
       </section>
     </div>

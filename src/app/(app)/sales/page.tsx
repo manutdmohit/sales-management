@@ -18,12 +18,6 @@ import { Button, ButtonLink } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/ui/data-table";
 import {
-  MobileCardFooter,
-  MobileCardHeader,
-  MobileCardMetrics,
-  MobileCardShell,
-} from "@/components/ui/mobile-card";
-import {
   ListPageHeader,
   MobileFilterPanel,
   MobileSearchField,
@@ -196,15 +190,6 @@ export default function SalesLedgerPage() {
     return <Badge variant="secondary">Paid</Badge>;
   }
 
-  function mobileWhenLabel(row: TransactionListItem): string {
-    if (row.kind === "BOOKING" && row.startAt && row.endAt) {
-      const { date, timeRange } = formatAppointmentSlot(row.startAt, row.endAt);
-      return `${date} · ${timeRange}`;
-    }
-    const { date, time } = formatSaleTimestamp(row.occurredAt);
-    return `${date} · ${time}`;
-  }
-
   return (
     <div className="space-y-4 sm:space-y-6">
       <ListPageHeader
@@ -287,7 +272,6 @@ export default function SalesLedgerPage() {
           {
             id: "customer",
             header: "Customer",
-            hideOnMobile: true,
             cell: (row) => (
               <div>
                 {row.clientId ? (
@@ -321,7 +305,6 @@ export default function SalesLedgerPage() {
           {
             id: "amount",
             header: "Amount",
-            hideOnMobile: true,
             headerClassName: "text-right",
             className: "text-right font-mono font-semibold",
             cell: (row) => money(row.amount),
@@ -341,7 +324,6 @@ export default function SalesLedgerPage() {
           {
             id: "status",
             header: "Status",
-            hideOnMobile: true,
             cell: (row) => statusBadge(row),
           },
           {
@@ -388,65 +370,6 @@ export default function SalesLedgerPage() {
         }
         meta={meta}
         onPageChange={setPage}
-        renderMobileCard={(row) => (
-          <MobileCardShell>
-            <MobileCardHeader
-              title={row.reference}
-              subtitle={
-                <>
-                  {mobileWhenLabel(row)}
-                  {" · "}
-                  {row.customerName}
-                </>
-              }
-              badge={
-                <div className="flex flex-col items-end gap-1">
-                  {kindBadge(row)}
-                  {statusBadge(row)}
-                </div>
-              }
-            />
-            <MobileCardMetrics
-              items={[
-                {
-                  label: "Amount",
-                  value: money(row.amount),
-                  highlight: true,
-                },
-                {
-                  label: "Payment",
-                  value: paymentLabel(row),
-                },
-              ]}
-            />
-            <MobileCardFooter>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-9"
-                onClick={() => {
-                  setEditing(false);
-                  setActive(row);
-                }}
-              >
-                View
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-9"
-                onClick={() => {
-                  setEditing(true);
-                  setActive(row);
-                }}
-              >
-                Edit
-              </Button>
-            </MobileCardFooter>
-          </MobileCardShell>
-        )}
       />
 
       <Sheet

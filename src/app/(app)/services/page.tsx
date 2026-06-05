@@ -15,12 +15,6 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/ui/data-table";
 import {
-  MobileCardFooter,
-  MobileCardHeader,
-  MobileCardMetrics,
-  MobileCardShell,
-} from "@/components/ui/mobile-card";
-import {
   ListPageHeader,
   MobileFilterPanel,
   MobileSearchField,
@@ -284,7 +278,6 @@ export default function ServicesPage() {
             id: "price",
             header: "Price",
             sortKey: "price",
-            hideOnMobile: true,
             headerClassName: "text-right",
             className: "text-right font-mono",
             cell: (s) => s.price.toFixed(2),
@@ -292,7 +285,6 @@ export default function ServicesPage() {
           {
             id: "status",
             header: "Status",
-            hideOnMobile: true,
             cell: (s) =>
               s.isActive ? (
                 <Badge variant="secondary">Active</Badge>
@@ -339,52 +331,6 @@ export default function ServicesPage() {
         sort={sort}
         dir={dir}
         onSortChange={handleSort}
-        renderMobileCard={(s) => (
-          <MobileCardShell>
-            <MobileCardHeader
-              title={s.name}
-              subtitle={[s.category, s.durationMinutes != null ? `${s.durationMinutes} min` : null]
-                .filter(Boolean)
-                .join(" · ")}
-              badge={
-                <Badge variant={s.isActive ? "secondary" : "outline"}>
-                  {s.isActive ? "Active" : "Inactive"}
-                </Badge>
-              }
-            />
-            <MobileCardMetrics
-              items={[
-                {
-                  label: "Price",
-                  value: s.price.toFixed(2),
-                  highlight: true,
-                },
-              ]}
-            />
-            <MobileCardFooter>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-9"
-                onClick={() => openEdit(s)}
-              >
-                <Pencil className="size-3.5" />
-                Edit
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-9 text-muted-foreground"
-                onClick={() => toggleActive(s)}
-              >
-                <Trash2 className="size-3.5" />
-                {s.isActive ? "Off" : "On"}
-              </Button>
-            </MobileCardFooter>
-          </MobileCardShell>
-        )}
       />
 
       <Sheet open={mode !== null} onOpenChange={(open) => !open && closeSheet()}>

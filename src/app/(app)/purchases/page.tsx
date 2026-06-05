@@ -21,13 +21,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DataTable } from "@/components/ui/data-table";
 import {
-  MobileCardBody,
-  MobileCardFooter,
-  MobileCardHeader,
-  MobileCardMetrics,
-  MobileCardShell,
-} from "@/components/ui/mobile-card";
-import {
   ListPageHeader,
   MobileFilterPanel,
   MobileSearchField,
@@ -404,7 +397,6 @@ export default function PurchasesPage() {
             id: "date",
             header: "Date",
             sortKey: "createdAt",
-            hideOnMobile: true,
             cell: (p) => formatDateYmd(p.createdAt),
           },
           {
@@ -435,7 +427,6 @@ export default function PurchasesPage() {
             id: "total",
             header: "Total",
             sortKey: "total",
-            hideOnMobile: true,
             headerClassName: "text-right",
             className: "text-right font-mono",
             cell: (p) => p.total.toFixed(2),
@@ -473,49 +464,6 @@ export default function PurchasesPage() {
         sort={sort}
         dir={dir}
         onSortChange={handleSort}
-        renderMobileCard={(p) => (
-          <MobileCardShell>
-            <MobileCardHeader
-              title={
-                p.supplierId ? (
-                  <Link
-                    href={`/suppliers/${p.supplierId}`}
-                    className="hover:text-primary"
-                  >
-                    {p.supplierName}
-                  </Link>
-                ) : (
-                  p.supplierName
-                )
-              }
-              subtitle={formatDateYmd(p.createdAt)}
-            />
-            <MobileCardBody className="line-clamp-2 text-xs">
-              {p.items.map((i) => purchaseItemLabel(i)).join(", ")}
-            </MobileCardBody>
-            <MobileCardMetrics
-              items={[
-                {
-                  label: "Total",
-                  value: p.total.toFixed(2),
-                  highlight: true,
-                },
-              ]}
-            />
-            <MobileCardFooter>
-              {p.receipts?.[0] && <ReceiptThumb receipt={p.receipts[0]} />}
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-9"
-                onClick={() => openEdit(p)}
-              >
-                Edit
-              </Button>
-            </MobileCardFooter>
-          </MobileCardShell>
-        )}
       />
 
       <Sheet

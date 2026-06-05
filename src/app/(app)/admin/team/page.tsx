@@ -22,11 +22,6 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/ui/data-table";
 import {
-  MobileCardFooter,
-  MobileCardHeader,
-  MobileCardShell,
-} from "@/components/ui/mobile-card";
-import {
   ListPageHeader,
   MobileFilterPanel,
   MobileSearchField,
@@ -292,7 +287,6 @@ export default function AdminTeamPage() {
           {
             id: "role",
             header: "Role",
-            hideOnMobile: true,
             cell: (m: TeamMember) => (
               <Badge variant={m.role === "ADMIN" ? "secondary" : "outline"}>
                 {ROLE_LABELS[m.role]}
@@ -302,7 +296,6 @@ export default function AdminTeamPage() {
           {
             id: "status",
             header: "Status",
-            hideOnMobile: true,
             cell: (m: TeamMember) =>
               m.isActive ? (
                 <Badge variant="secondary">Active</Badge>
@@ -351,51 +344,6 @@ export default function AdminTeamPage() {
         emptyMessage="No team members yet. Click Add member to create one."
         meta={meta}
         onPageChange={setPage}
-        renderMobileCard={(m) => (
-          <MobileCardShell>
-            <MobileCardHeader
-              title={m.name}
-              subtitle={m.email}
-              badge={
-                <div className="flex flex-col items-end gap-1">
-                  <Badge variant={m.role === "ADMIN" ? "secondary" : "outline"}>
-                    {ROLE_LABELS[m.role]}
-                  </Badge>
-                  <Badge variant={m.isActive ? "secondary" : "outline"}>
-                    {m.isActive ? "Active" : "Inactive"}
-                  </Badge>
-                </div>
-              }
-            />
-            <MobileCardFooter>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-9"
-                onClick={() => openEdit(m)}
-              >
-                <Pencil className="size-3.5" />
-                Edit
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-9"
-                onClick={() => toggleActive(m)}
-                disabled={user?._id === m._id}
-              >
-                {m.isActive ? (
-                  <PauseCircle className="size-3.5" />
-                ) : (
-                  <CheckCircle2 className="size-3.5" />
-                )}
-                {m.isActive ? "Deactivate" : "Activate"}
-              </Button>
-            </MobileCardFooter>
-          </MobileCardShell>
-        )}
       />
 
       <Sheet open={mode !== null} onOpenChange={(open) => !open && closeSheet()}>

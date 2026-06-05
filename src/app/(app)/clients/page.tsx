@@ -15,15 +15,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DataTable } from "@/components/ui/data-table";
 import {
-  MobileCardBody,
-  MobileCardDetail,
-  MobileCardDetails,
-  MobileCardFooter,
-  MobileCardHeader,
-  MobileCardMetrics,
-  MobileCardShell,
-} from "@/components/ui/mobile-card";
-import {
   ListPageHeader,
   MobileFilterPanel,
   MobileSearchField,
@@ -215,7 +206,6 @@ export default function ClientsPage() {
             id: "phone",
             header: "Contact",
             sortKey: "phone",
-            hideOnMobile: true,
             cell: (c: Client) => c.phone,
           },
           {
@@ -270,40 +260,6 @@ export default function ClientsPage() {
         dir={dir}
         onSortChange={handleSort}
         emptyMessage="No clients yet. Add one or book a service to auto-create."
-        renderMobileCard={(c) => (
-          <MobileCardShell>
-            <MobileCardHeader
-              title={
-                <Link href={`/clients/${c._id}`} className="hover:text-primary">
-                  {c.name}
-                </Link>
-              }
-              subtitle={[c.phone, c.email].filter(Boolean).join(" · ")}
-            />
-            {c.address && (
-              <MobileCardBody className="border-t border-border/40 pt-3 text-xs">
-                {c.address}
-              </MobileCardBody>
-            )}
-            <MobileCardFooter>
-              <ClientEmailButton client={c} variant="outline" size="sm" className="h-9" />
-              <ButtonLink href={`/clients/${c._id}`} variant="outline" size="sm" className="h-9">
-                <Eye className="size-3.5" />
-                View
-              </ButtonLink>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-9"
-                onClick={() => openEdit(c)}
-              >
-                <Pencil className="size-3.5" />
-                Edit
-              </Button>
-            </MobileCardFooter>
-          </MobileCardShell>
-        )}
       />
 
       <Sheet open={formOpen} onOpenChange={setFormOpen}>

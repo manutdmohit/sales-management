@@ -17,12 +17,6 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
 import {
-  MobileCardFooter,
-  MobileCardHeader,
-  MobileCardMetrics,
-  MobileCardShell,
-} from "@/components/ui/mobile-card";
-import {
   ListPageHeader,
   MobileFilterPanel,
   MobileSearchField,
@@ -396,7 +390,6 @@ export default function InventoryPage() {
           {
             id: "stock",
             header: "Stock",
-            hideOnMobile: true,
             headerClassName: "text-right",
             className: "text-right font-mono",
             cell: (r) => formatQuantityWithUnit(r.stock, r.unitId),
@@ -413,7 +406,6 @@ export default function InventoryPage() {
           {
             id: "status",
             header: "Status",
-            hideOnMobile: true,
             cell: (r) =>
               r.isLowStock ? (
                 <Badge variant="destructive">Low stock</Badge>
@@ -444,48 +436,6 @@ export default function InventoryPage() {
         sort={sort}
         dir={dir}
         onSortChange={handleSort}
-        renderMobileCard={(r) => (
-          <MobileCardShell>
-            <MobileCardHeader
-              title={r.productName}
-              subtitle={[r.sku, isManufacturer && r.productKind === "RAW" ? "Raw" : isManufacturer ? "Finished" : null]
-                .filter(Boolean)
-                .join(" · ")}
-              badge={
-                r.isLowStock ? (
-                  <Badge variant="destructive">Low</Badge>
-                ) : (
-                  <Badge variant="secondary">OK</Badge>
-                )
-              }
-            />
-            <MobileCardMetrics
-              items={[
-                {
-                  label: "On hand",
-                  value: formatQuantityWithUnit(r.stock, r.unitId),
-                  highlight: true,
-                },
-                {
-                  label: "Min stock",
-                  value: formatQuantityWithUnit(r.minStock, r.unitId),
-                },
-              ]}
-            />
-            <MobileCardFooter>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-9 touch-manipulation"
-                onClick={() => openAdjust(r)}
-              >
-                <SlidersHorizontal className="size-3.5" />
-                Adjust
-              </Button>
-            </MobileCardFooter>
-          </MobileCardShell>
-        )}
       />
 
       <Sheet open={adjustOpen} onOpenChange={setAdjustOpen}>

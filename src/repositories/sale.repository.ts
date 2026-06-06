@@ -6,7 +6,7 @@ import {
   type PaginatedResult,
   type SortDir,
 } from "@/lib/pagination";
-import { normalizeMongoWeekKey } from "@/lib/report-ranges";
+import { normalizeMongoWeekKey, mongoGroupDateId } from "@/lib/report-ranges";
 import { SaleModel } from "@/models/sale.model";
 
 export const saleRepository = {
@@ -203,9 +203,7 @@ export const saleRepository = {
       },
       {
         $group: {
-          _id: {
-            $dateToString: { format: dateFormat, date: "$createdAt" },
-          },
+          _id: mongoGroupDateId(dateFormat),
           count: { $sum: 1 },
           total: { $sum: "$total" },
         },
@@ -241,9 +239,7 @@ export const saleRepository = {
       },
       {
         $group: {
-          _id: {
-            $dateToString: { format: dateFormat, date: "$createdAt" },
-          },
+          _id: mongoGroupDateId(dateFormat),
           count: { $sum: 1 },
           revenue: { $sum: "$subtotal" },
           cost: { $sum: { $ifNull: ["$totalCost", 0] } },

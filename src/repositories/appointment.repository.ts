@@ -7,7 +7,7 @@ import {
   type PaginatedResult,
   type SortDir,
 } from "@/lib/pagination";
-import { normalizeMongoWeekKey } from "@/lib/report-ranges";
+import { normalizeMongoWeekKey, mongoGroupDateId } from "@/lib/report-ranges";
 import { AppointmentModel } from "@/models/appointment.model";
 
 function mapAppointment(doc: { _id: unknown } & Record<string, unknown>): Appointment {
@@ -182,9 +182,7 @@ export const appointmentRepository = {
       },
       {
         $group: {
-          _id: {
-            $dateToString: { format: dateFormat, date: "$createdAt" },
-          },
+          _id: mongoGroupDateId(dateFormat),
           count: { $sum: 1 },
           total: { $sum: "$price" },
         },

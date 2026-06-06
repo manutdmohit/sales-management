@@ -1,6 +1,6 @@
 import type { ProductionRun } from "@/domain/types";
 import { mapId } from "@/lib/map-document";
-import { normalizeMongoWeekKey } from "@/lib/report-ranges";
+import { normalizeMongoWeekKey, mongoGroupDateId } from "@/lib/report-ranges";
 import {
   buildPaginatedResult,
   mongoSort,
@@ -130,9 +130,7 @@ export const productionRunRepository = {
       },
       {
         $group: {
-          _id: {
-            $dateToString: { format: dateFormat, date: "$createdAt" },
-          },
+          _id: mongoGroupDateId(dateFormat),
           count: { $sum: 1 },
           total: { $sum: "$quantityProduced" },
         },
@@ -216,9 +214,7 @@ export const productionRunRepository = {
       { $unwind: "$materialsSnapshot" },
       {
         $group: {
-          _id: {
-            $dateToString: { format: dateFormat, date: "$createdAt" },
-          },
+          _id: mongoGroupDateId(dateFormat),
           count: { $sum: 1 },
           total: { $sum: "$materialsSnapshot.lineCost" },
         },

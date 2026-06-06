@@ -113,6 +113,19 @@ function ReportChartFrame({ children }: { children: ReactElement }) {
   );
 }
 
+function tooltipIndexNumber(index: unknown): number | undefined {
+  if (typeof index === "number") return index;
+  if (
+    index &&
+    typeof index === "object" &&
+    "index" in index &&
+    typeof index.index === "number"
+  ) {
+    return index.index;
+  }
+  return undefined;
+}
+
 function ReportChartTooltip({
   active,
   payload,
@@ -121,18 +134,26 @@ function ReportChartTooltip({
   amountLabel,
   countLabel,
   itemLabel = "Product",
+  onKeepOpen,
 }: {
   active?: boolean;
-  payload?: { payload: ChartPoint; name?: string; value?: number }[];
-  label?: string;
+  payload?: unknown;
+  label?: string | number;
   kind: ReportKind;
   amountLabel: string;
   countLabel: string;
   itemLabel?: string;
+  onKeepOpen?: () => void;
 }) {
-  if (!active || !payload?.length) return null;
+  if (!active || !Array.isArray(payload) || payload.length === 0) return null;
 
-  const point = payload[0].payload;
+  const entries = payload as {
+    payload?: ChartPoint;
+    name?: string;
+    value?: number;
+  }[];
+  const point = entries[0].payload;
+  if (!point) return null;
   const details = point.details ?? [];
   const shown = details.slice(0, TOOLTIP_DETAIL_LIMIT);
   const remaining = details.length - shown.length;
@@ -150,10 +171,17 @@ function ReportChartTooltip({
   const showLineCost = kind === "profit";
 
   return (
-    <div className="max-w-xs rounded-md border border-border bg-popover px-3 py-2 text-sm shadow-md">
+    <div
+      className="max-w-xs rounded-md border border-border bg-popover px-3 py-2 text-sm shadow-md"
+      onPointerDown={(e) => {
+        e.stopPropagation();
+        onKeepOpen?.();
+      }}
+      onClick={(e) => e.stopPropagation()}
+    >
       <p className="font-medium">{label}</p>
       <div className="mt-1 space-y-0.5 text-xs text-muted-foreground">
-        {payload.map((entry) => (
+        {entries.map((entry) => (
           <p key={String(entry.name)}>
             <span className="text-foreground">{entry.name}: </span>
             {typeof entry.value === "number"
@@ -162,7 +190,7 @@ function ReportChartTooltip({
                   ? entry.value.toFixed(2)
                   : formatQuantity(entry.value)
                 : entry.value
-              : entry.value}
+              : String(entry.value ?? "")}
           </p>
         ))}
       </div>
@@ -202,7 +230,7 @@ function ReportChartTooltip({
       )}
       {details.length > 0 && (
         <p className="mt-1.5 text-[10px] text-muted-foreground">
-          {itemLabel} · {partyLabel} per line
+          {itemLabel} · {partyLabel} per line · click to keep open
         </p>
       )}
     </div>
@@ -211,33 +239,34 @@ function ReportChartTooltip({
 
 export default function ReportsPage() {
   const { businessId, businesses, loading: businessLoading } = useBusiness();
-  const [kind, setKind] = useState<ReportKind>("profit");
+  const [selectedKind, setSelectedKind] = useState<ReportKind>("profit");
   const [period, setPeriod] = useState<ReportPeriod>("daily");
   const [from, setFrom] = useState(defaultCustomFrom);
   const [to, setTo] = useState(defaultCustomTo);
   const [report, setReport] = useState<ReportResult | null>(null);
   const [loading, setLoading] = useState(false);
+  const [pinnedAmountIndex, setPinnedAmountIndex] = useState<number | null>(null);
+  const [pinnedCountIndex, setPinnedCountIndex] = useState<number | null>(null);
 
   const selectedBusiness = businesses.find((b) => b._id === businessId);
   const showServicesReport = hasFeature(selectedBusiness?.type, "services");
   const showProductionReport = hasFeature(selectedBusiness?.type, "manufacturing");
 
-  useEffect(() => {
-    if (kind === "services" && !showServicesReport) {
-      setKind("profit");
+  const kind = useMemo((): ReportKind => {
+    if (selectedKind === "services" && !showServicesReport) return "profit";
+    if (
+      (selectedKind === "production" || selectedKind === "rawConsumption") &&
+      !showProductionReport
+    ) {
+      return "profit";
     }
-    if (kind === "production" && !showProductionReport) {
-      setKind("profit");
-    }
-    if (kind === "rawConsumption" && !showProductionReport) {
-      setKind("profit");
-    }
-  }, [kind, showServicesReport, showProductionReport]);
+    return selectedKind;
+  }, [selectedKind, showServicesReport, showProductionReport]);
 
   const isProfitReport = kind === "profit";
 
-  const loadReport = useCallback(async () => {
-    if (!businessId) return;
+  const fetchReport = useCallback(async (): Promise<ReportResult | null> => {
+    if (!businessId) return null;
     const params = new URLSearchParams({
       businessId,
       kind,
@@ -247,20 +276,44 @@ export default function ReportsPage() {
       params.set("from", from);
       params.set("to", to);
     }
+    const res = await fetch(`/api/reports?${params}`);
+    const json = await res.json();
+    return json.data ?? null;
+  }, [businessId, kind, period, from, to]);
+
+  const reloadReport = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/reports?${params}`);
-      const json = await res.json();
-      setReport(json.data ?? null);
+      const data = await fetchReport();
+      setReport(data);
+      setPinnedAmountIndex(null);
+      setPinnedCountIndex(null);
     } finally {
       setLoading(false);
     }
-  }, [businessId, kind, period, from, to]);
+  }, [fetchReport]);
 
   useEffect(() => {
     if (!businessId) return;
-    void loadReport();
-  }, [businessId, loadReport]);
+    let cancelled = false;
+    void (async () => {
+      await Promise.resolve();
+      if (cancelled) return;
+      setLoading(true);
+      try {
+        const data = await fetchReport();
+        if (cancelled) return;
+        setReport(data);
+        setPinnedAmountIndex(null);
+        setPinnedCountIndex(null);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [businessId, fetchReport]);
 
   const displayReport = businessId ? report : null;
   const displayLoading = Boolean(businessId && loading);
@@ -275,6 +328,23 @@ export default function ReportsPage() {
       })) ?? [],
     [displayReport]
   );
+
+  function pinChartIndex(
+    label: string | undefined,
+    setPinned: React.Dispatch<React.SetStateAction<number | null>>
+  ) {
+    if (!label) return;
+    const index = chartData.findIndex((point) => point.name === label);
+    if (index >= 0) setPinned(index);
+  }
+
+  function togglePinnedBar(
+    index: number | undefined,
+    setPinned: React.Dispatch<React.SetStateAction<number | null>>
+  ) {
+    if (typeof index !== "number") return;
+    setPinned((prev) => (prev === index ? null : index));
+  }
 
   const breakdownBuckets = useMemo(
     () => [...(displayReport?.buckets ?? [])].reverse(),
@@ -388,7 +458,7 @@ export default function ReportsPage() {
             key={k.id}
             variant={kind === k.id ? "default" : "outline"}
             size="sm"
-            onClick={() => setKind(k.id)}
+            onClick={() => setSelectedKind(k.id)}
           >
             {k.label}
           </Button>
@@ -428,7 +498,7 @@ export default function ReportsPage() {
               onChange={(e) => setTo(e.target.value)}
             />
           </div>
-          <Button onClick={loadReport}>Apply range</Button>
+          <Button onClick={() => void reloadReport()}>Apply range</Button>
         </div>
       )}
 
@@ -664,7 +734,16 @@ export default function ReportsPage() {
               </div>
             ) : (
               <ReportChartFrame>
-                <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                <BarChart
+                  data={chartData}
+                  margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
+                  onClick={(state) =>
+                    togglePinnedBar(
+                      tooltipIndexNumber(state?.activeTooltipIndex),
+                      setPinnedAmountIndex
+                    )
+                  }
+                >
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                   <XAxis
                     dataKey="name"
@@ -673,14 +752,28 @@ export default function ReportsPage() {
                   />
                   <YAxis tick={{ fontSize: 11 }} />
                   <Tooltip
-                    content={
+                    active={pinnedAmountIndex !== null ? true : undefined}
+                    defaultIndex={pinnedAmountIndex ?? undefined}
+                    wrapperStyle={{ pointerEvents: "auto" }}
+                    content={(props) => (
                       <ReportChartTooltip
+                        active={props.active}
+                        payload={props.payload}
+                        label={props.label}
                         kind={kind}
                         amountLabel={amountLabel}
                         countLabel={countLabel}
                         itemLabel={itemLabel}
+                        onKeepOpen={() =>
+                          pinChartIndex(
+                            typeof props.label === "string"
+                              ? props.label
+                              : undefined,
+                            setPinnedAmountIndex
+                          )
+                        }
                       />
-                    }
+                    )}
                   />
                   <Legend />
                   <Bar
@@ -710,7 +803,16 @@ export default function ReportsPage() {
               </div>
             ) : (
               <ReportChartFrame>
-                <LineChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                <LineChart
+                  data={chartData}
+                  margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
+                  onClick={(state) =>
+                    togglePinnedBar(
+                      tooltipIndexNumber(state?.activeTooltipIndex),
+                      setPinnedCountIndex
+                    )
+                  }
+                >
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                   <XAxis
                     dataKey="name"
@@ -719,14 +821,28 @@ export default function ReportsPage() {
                   />
                   <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
                   <Tooltip
-                    content={
+                    active={pinnedCountIndex !== null ? true : undefined}
+                    defaultIndex={pinnedCountIndex ?? undefined}
+                    wrapperStyle={{ pointerEvents: "auto" }}
+                    content={(props) => (
                       <ReportChartTooltip
+                        active={props.active}
+                        payload={props.payload}
+                        label={props.label}
                         kind={kind}
                         amountLabel={amountLabel}
                         countLabel={countLabel}
                         itemLabel={itemLabel}
+                        onKeepOpen={() =>
+                          pinChartIndex(
+                            typeof props.label === "string"
+                              ? props.label
+                              : undefined,
+                            setPinnedCountIndex
+                          )
+                        }
                       />
-                    }
+                    )}
                   />
                   <Legend />
                   <Line

@@ -31,7 +31,6 @@ type UpdateInput = {
   email?: string;
   role?: UserRole;
   isActive?: boolean;
-  password?: string;
 };
 
 function toMember(user: {
@@ -144,17 +143,30 @@ export const teamService = {
       }
     }
 
-    const passwordHash = input.password
-      ? await bcrypt.hash(input.password, 12)
-      : undefined;
-
     const updated = await userRepository.update(id, {
       name: input.name?.trim(),
       email: input.email?.toLowerCase().trim(),
       role: input.role,
       isActive: input.isActive,
-      passwordHash,
     });
+    if (!updated) {
+      throw new AppError("Team member not found", 404, "NOT_FOUND");
+    }
+    return toMember(updated);
+  },
+
+  async updatePassword(
+    id: string,
+    password: string,
+    _actingUserId: string
+  ): Promise<TeamMember> {
+    const existing = await userRepository.findById(id);
+    if (!existing) {
+      throw new AppError("Team member not found", 404, "NOT_FOUND");
+    }
+
+    const passwordHash = await bcrypt.hash(password, 12);
+    const updated = await userRepository.update(id, { passwordHash });
     if (!updated) {
       throw new AppError("Team member not found", 404, "NOT_FOUND");
     }

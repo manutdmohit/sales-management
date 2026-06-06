@@ -3,11 +3,11 @@
 import { useCallback, useMemo, useState } from "react";
 import {
   CheckCircle2,
+  KeyRound,
   Pencil,
   PauseCircle,
   Plus,
   ShieldCheck,
-  Trash2,
   Users,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -35,7 +35,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 
-type FormMode = "create" | "edit" | null;
+type FormMode = "create" | "edit" | "password" | null;
 
 const ROLE_LABELS: Record<UserRole, string> = {
   ADMIN: "Admin",
@@ -51,6 +51,7 @@ const emptyForm = {
   name: "",
   email: "",
   password: "",
+  confirmPassword: "",
   role: "STAFF" as UserRole,
 };
 
@@ -106,6 +107,19 @@ export default function AdminTeamPage() {
       name: member.name,
       email: member.email,
       password: "",
+      confirmPassword: "",
+      role: member.role,
+    });
+  }
+
+  function openPasswordReset(member: TeamMember) {
+    setMode("password");
+    setEditing(member);
+    setForm({
+      name: member.name,
+      email: member.email,
+      password: "",
+      confirmPassword: "",
       role: member.role,
     });
   }
@@ -118,6 +132,10 @@ export default function AdminTeamPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (mode === "password") {
+      await handlePasswordSubmit();
+      return;
+    }
     if (!form.name.trim() || !form.email.trim()) {
       toast.error("Name and email are required");
       return;
@@ -144,16 +162,14 @@ export default function AdminTeamPage() {
         if (!res.ok) throw new Error(messageFrom(json));
         toast.success(`Added ${json.data.name}`);
       } else if (mode === "edit" && editing) {
-        const payload: Record<string, unknown> = {
-          name: form.name.trim(),
-          email: form.email.trim(),
-          role: form.role,
-        };
-        if (form.password.trim()) payload.password = form.password.trim();
         const res = await fetch(`/api/team/${editing._id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
+          body: JSON.stringify({
+            name: form.name.trim(),
+            email: form.email.trim(),
+            role: form.role,
+          }),
         });
         const json = await res.json();
         if (!res.ok) throw new Error(messageFrom(json));
@@ -161,6 +177,38 @@ export default function AdminTeamPage() {
       }
       closeSheet();
       await reload();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Request failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handlePasswordSubmit() {
+    if (form.password.length < 6) {
+      toast.error("Password must be at least 6 characters");
+      return;
+    }
+    if (form.password !== form.confirmPassword) {
+      toast.error("Passwords do not match");
+      return;
+    }
+    if (!editing) return;
+
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/team/${editing._id}/password`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          password: form.password,
+          confirmPassword: form.confirmPassword,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(messageFrom(json));
+      toast.success(`Password updated for ${editing.name}`);
+      closeSheet();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Request failed");
     } finally {
@@ -322,6 +370,14 @@ export default function AdminTeamPage() {
                 <Button
                   variant="ghost"
                   size="icon-sm"
+                  onClick={() => openPasswordReset(m)}
+                  aria-label={`Reset password for ${m.name}`}
+                >
+                  <KeyRound className="size-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
                   onClick={() => toggleActive(m)}
                   disabled={user?._id === m._id}
                   aria-label={
@@ -351,16 +407,58 @@ export default function AdminTeamPage() {
           <form onSubmit={handleSubmit} className="flex h-full min-h-0 flex-col">
             <SheetHeader className="border-b border-border/60">
               <SheetTitle>
-                {mode === "create" ? "Add team member" : "Edit team member"}
+                {mode === "create"
+                  ? "Add team member"
+                  : mode === "password"
+                    ? "Reset password"
+                    : "Edit team member"}
               </SheetTitle>
               <SheetDescription>
                 {mode === "create"
                   ? "Set their login email, password, and access level."
-                  : "Update details, change role, or reset the password."}
+                  : mode === "password"
+                    ? `Set a new password for ${editing?.name ?? "this member"}. They will use it on next sign-in.`
+                    : "Update name, email, or role."}
               </SheetDescription>
             </SheetHeader>
 
             <div className="flex flex-1 flex-col gap-5 overflow-y-auto px-4 py-5">
+              {mode === "password" ? (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="reset-password">New password</Label>
+                    <Input
+                      id="reset-password"
+                      type="password"
+                      autoComplete="new-password"
+                      placeholder="At least 6 characters"
+                      required
+                      value={form.password}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, password: e.target.value }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="reset-confirm">Confirm password</Label>
+                    <Input
+                      id="reset-confirm"
+                      type="password"
+                      autoComplete="new-password"
+                      placeholder="Re-enter password"
+                      required
+                      value={form.confirmPassword}
+                      onChange={(e) =>
+                        setForm((f) => ({
+                          ...f,
+                          confirmPassword: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
               <div className="space-y-2">
                 <Label htmlFor="member-name">Name</Label>
                 <Input
@@ -390,31 +488,22 @@ export default function AdminTeamPage() {
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="member-password">
-                  {mode === "create" ? "Password" : "New password"}
-                </Label>
-                <Input
-                  id="member-password"
-                  type="password"
-                  autoComplete="new-password"
-                  placeholder={
-                    mode === "create"
-                      ? "At least 6 characters"
-                      : "Leave blank to keep current"
-                  }
-                  required={mode === "create"}
-                  value={form.password}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, password: e.target.value }))
-                  }
-                />
-                {mode === "edit" && (
-                  <p className="text-xs text-muted-foreground">
-                    Leave blank to keep the existing password.
-                  </p>
-                )}
-              </div>
+              {mode === "create" && (
+                <div className="space-y-2">
+                  <Label htmlFor="member-password">Password</Label>
+                  <Input
+                    id="member-password"
+                    type="password"
+                    autoComplete="new-password"
+                    placeholder="At least 6 characters"
+                    required
+                    value={form.password}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, password: e.target.value }))
+                    }
+                  />
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label htmlFor="member-role">Role</Label>
@@ -439,6 +528,8 @@ export default function AdminTeamPage() {
                   {ROLE_HINTS[form.role]}
                 </p>
               </div>
+                </>
+              )}
             </div>
 
             <SheetFooter className="flex-row justify-end gap-2 border-t border-border/60">
@@ -450,7 +541,9 @@ export default function AdminTeamPage() {
                   ? "Saving…"
                   : mode === "create"
                     ? "Add member"
-                    : "Save changes"}
+                    : mode === "password"
+                      ? "Update password"
+                      : "Save changes"}
               </Button>
             </SheetFooter>
           </form>

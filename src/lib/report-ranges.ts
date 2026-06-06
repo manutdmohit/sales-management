@@ -1,6 +1,44 @@
 import { formatDateYmd, formatMonthYmd } from "@/lib/format-datetime";
+import { reminderTimeZone } from "@/lib/reminder-dates";
 
 export type ReportPeriod = "daily" | "weekly" | "monthly" | "yearly" | "custom";
+
+/** IANA timezone for report calendar buckets (matches Mongo $dateToString). */
+export function reportTimeZone(): string {
+  return reminderTimeZone();
+}
+
+function zonedCalendarParts(date: Date): {
+  year: number;
+  month: number;
+  day: number;
+} {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: reportTimeZone(),
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  return {
+    year: Number(parts.find((p) => p.type === "year")?.value ?? 0),
+    month: Number(parts.find((p) => p.type === "month")?.value ?? 0),
+    day: Number(parts.find((p) => p.type === "day")?.value ?? 0),
+  };
+}
+
+/** Mongo $group _id for time-bucketed report aggregations. */
+export function mongoGroupDateId(
+  dateFormat: string,
+  dateField = "$createdAt"
+): { $dateToString: { format: string; date: string; timezone: string } } {
+  return {
+    $dateToString: {
+      format: dateFormat,
+      date: dateField,
+      timezone: reportTimeZone(),
+    },
+  };
+}
 
 /** Human-readable labels for preset report ranges (not custom). */
 export const REPORT_PERIOD_OPTIONS = [
@@ -149,25 +187,28 @@ export function resolveReportRange(
 }
 
 export function bucketKeyForDate(date: Date, period: ReportPeriod): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
+  const { year, month, day } = zonedCalendarParts(date);
+  const m = String(month).padStart(2, "0");
+  const d = String(day).padStart(2, "0");
 
-  if (period === "monthly") return `${y}-${m}`;
-  if (period === "yearly") return `${y}`;
+  if (period === "monthly") return `${year}-${m}`;
+  if (period === "yearly") return `${String(year)}`;
   if (period === "weekly") return isoWeekKey(date);
-  return `${y}-${m}-${d}`;
+  return `${year}-${m}-${d}`;
 }
 
 function isoWeekKey(date: Date): string {
-  const utc = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const { year, month, day } = zonedCalendarParts(date);
+  const utc = new Date(Date.UTC(year, month - 1, day));
   const dayNum = utc.getUTCDay() || 7;
   utc.setUTCDate(utc.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(utc.getUTCFullYear(), 0, 1));
-  const weekNo = Math.ceil(
-    ((utc.getTime() - yearStart.getTime()) / 86400000 + 1) / 7
-  );
-  return `${utc.getUTCFullYear()}-W${String(weekNo).padStart(2, "0")}`;
+  const isoYear = utc.getUTCFullYear();
+  const jan4 = new Date(Date.UTC(isoYear, 0, 4));
+  const jan4Day = jan4.getUTCDay() || 7;
+  jan4.setUTCDate(jan4.getUTCDate() + 1 - jan4Day);
+  const week =
+    1 + Math.floor((utc.getTime() - jan4.getTime()) / 604_800_000);
+  return `${isoYear}-W${String(week).padStart(2, "0")}`;
 }
 
 export function bucketLabel(key: string, period: ReportPeriod): string {
@@ -210,6 +251,29 @@ export function iterateBucketKeys(
     }
   }
 
+  const endKey = bucketKeyForDate(to, period);
+  if (keys.length === 0 || keys[keys.length - 1] !== endKey) {
+    keys.push(endKey);
+  }
+
+  return keys;
+}
+
+/** Merge preset bucket keys with any keys returned from aggregation. */
+export function mergeBucketKeys(
+  from: Date,
+  to: Date,
+  period: ReportPeriod,
+  rowKeys: string[]
+): string[] {
+  const keys = iterateBucketKeys(from, to, period);
+  const seen = new Set(keys);
+  for (const key of rowKeys) {
+    if (!seen.has(key)) {
+      keys.push(key);
+      seen.add(key);
+    }
+  }
   return keys;
 }
 

@@ -16,12 +16,20 @@ export const updateTeamMemberSchema = z
     email: z.string().email().max(200).optional(),
     role: roleEnum.optional(),
     isActive: z.boolean().optional(),
-    password: z
-      .string()
-      .min(6, "Password must be at least 6 characters")
-      .max(100)
-      .optional(),
   })
   .refine((data) => Object.keys(data).length > 0, {
     message: "No changes provided",
+  });
+
+export const updateTeamPasswordSchema = z
+  .object({
+    password: z
+      .string()
+      .min(6, "Password must be at least 6 characters")
+      .max(100),
+    confirmPassword: z.string().min(1, "Confirm the password"),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
   });

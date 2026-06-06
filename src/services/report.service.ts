@@ -6,7 +6,7 @@ import type {
 import {
   bucketKeyForDate,
   bucketLabel,
-  iterateBucketKeys,
+  mergeBucketKeys,
   mongoDateFormat,
   resolveReportRange,
   type ReportLineDetail,
@@ -155,7 +155,12 @@ export const reportService = {
         },
       ])
     );
-    const keys = iterateBucketKeys(from, to, query.period);
+    const keys = mergeBucketKeys(
+      from,
+      to,
+      query.period,
+      rows.map((r) => r.key)
+    );
 
     const detailRows: DetailRow[] =
       query.kind === "sales"
@@ -282,7 +287,12 @@ export const reportService = {
       }
     }
 
-    const keys = iterateBucketKeys(from, to, period);
+    const keys = mergeBucketKeys(
+      from,
+      to,
+      period,
+      [...productRows.map((r) => r.key), ...serviceRows.map((r) => r.key)]
+    );
     const buckets = keys.map((key) => {
       const product = productMap.get(key);
       const service = serviceMap.get(key);

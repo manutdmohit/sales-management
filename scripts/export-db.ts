@@ -9,16 +9,12 @@
  * By default writes to exports/<timestamp>/ and strips passwordHash from users.
  */
 import { mkdir, writeFile } from "fs/promises";
-import dns from "node:dns";
 import { resolve } from "path";
 import { config } from "dotenv";
 import mongoose from "mongoose";
 
 config({ path: resolve(process.cwd(), ".env.local") });
 config({ path: resolve(process.cwd(), ".env") });
-
-// Some local DNS resolvers fail Atlas SRV lookups (querySrv ECONNREFUSED).
-dns.setServers(["8.8.8.8", "8.8.4.4", "1.1.1.1"]);
 
 const COLLECTIONS = [
   "businesses",

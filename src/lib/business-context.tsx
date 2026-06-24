@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import type { Business } from "@/domain/types";
+import { resolveBusinessId } from "@/lib/business-cookie";
 
 const STORAGE_KEY = "inventory-platform:businessId";
 
@@ -22,33 +23,56 @@ type BusinessContextValue = {
 
 const BusinessContext = createContext<BusinessContextValue | null>(null);
 
-export function BusinessProvider({ children }: { children: ReactNode }) {
-  const [businesses, setBusinesses] = useState<Business[]>([]);
-  const [businessId, setBusinessIdState] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+export function BusinessProvider({
+  children,
+  initialBusinesses = null,
+  initialBusinessId = null,
+}: {
+  children: ReactNode;
+  initialBusinesses?: Business[] | null;
+  initialBusinessId?: string | null;
+}) {
+  const hasInitial = initialBusinesses != null;
+  const [businesses, setBusinesses] = useState<Business[]>(
+    initialBusinesses ?? []
+  );
+  const [businessId, setBusinessIdState] = useState<string | null>(
+    initialBusinessId
+  );
+  const [loading, setLoading] = useState(!hasInitial);
 
   const refresh = useCallback(async () => {
-    const res = await fetch("/api/businesses");
+    const res = await fetch("/api/bootstrap");
     const json = await res.json();
-    const list: Business[] = json.data ?? [];
+    const data = json.data;
+    const list: Business[] = data?.businesses ?? [];
     setBusinesses(list);
     if (list.length > 0) {
       const stored =
         typeof window !== "undefined"
           ? localStorage.getItem(STORAGE_KEY)
           : null;
-      const valid = list.find((b) => b._id === stored);
-      setBusinessIdState(valid?._id ?? list[0]._id);
+      setBusinessIdState(
+        resolveBusinessId(list, data?.businessId ?? stored)
+      );
+    } else {
+      setBusinessIdState(null);
     }
   }, []);
 
   useEffect(() => {
+    if (hasInitial) return;
     refresh().finally(() => setLoading(false));
-  }, [refresh]);
+  }, [hasInitial, refresh]);
 
   const setBusinessId = useCallback((id: string) => {
     setBusinessIdState(id);
     localStorage.setItem(STORAGE_KEY, id);
+    void fetch("/api/business/select", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ businessId: id }),
+    });
   }, []);
 
   return (

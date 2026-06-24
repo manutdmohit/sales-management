@@ -28,28 +28,35 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+export function AuthProvider({
+  children,
+  initialUser = null,
+}: {
+  children: ReactNode;
+  initialUser?: AuthUser | null;
+}) {
   const router = useRouter();
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<AuthUser | null>(initialUser);
+  const [loading, setLoading] = useState(!initialUser);
 
   const refresh = useCallback(async () => {
     try {
-      const res = await fetch("/api/auth/me");
+      const res = await fetch("/api/bootstrap");
       if (!res.ok) {
         setUser(null);
         return;
       }
       const json = await res.json();
-      setUser(json.data ?? null);
+      setUser(json.data?.user ?? null);
     } catch {
       setUser(null);
     }
   }, []);
 
   useEffect(() => {
+    if (initialUser) return;
     refresh().finally(() => setLoading(false));
-  }, [refresh]);
+  }, [initialUser, refresh]);
 
   const logout = useCallback(async () => {
     await fetch("/api/auth/logout", { method: "POST" });

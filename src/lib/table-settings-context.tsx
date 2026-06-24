@@ -27,34 +27,33 @@ const TableSettingsContext = createContext<TableSettingsContextValue | null>(
   null
 );
 
-export function TableSettingsProvider({ children }: { children: ReactNode }) {
+export function TableSettingsProvider({
+  children,
+  initialPageSize = null,
+}: {
+  children: ReactNode;
+  initialPageSize?: TablePageSizeOption | null;
+}) {
+  const hasInitial = initialPageSize != null;
   const [pageSize, setPageSizeState] = useState<TablePageSizeOption>(
-    DEFAULT_TABLE_PAGE_SIZE
+    initialPageSize ?? DEFAULT_TABLE_PAGE_SIZE
   );
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(!hasInitial);
 
   const refresh = useCallback(async () => {
-    const res = await fetch("/api/settings");
+    const res = await fetch("/api/bootstrap");
     const json = await res.json();
-    if (res.ok && json.data?.defaultTablePageSize != null) {
-      setPageSizeState(clampTablePageSize(json.data.defaultTablePageSize));
+    if (res.ok && json.data?.tablePageSize != null) {
+      setPageSizeState(clampTablePageSize(json.data.tablePageSize));
     }
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    const timer = window.setTimeout(() => {
-      refresh()
-        .catch(() => undefined)
-        .finally(() => {
-          if (!cancelled) setLoading(false);
-        });
-    }, 1500);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-  }, [refresh]);
+    if (hasInitial) return;
+    refresh()
+      .catch(() => undefined)
+      .finally(() => setLoading(false));
+  }, [hasInitial, refresh]);
 
   const setPageSize = useCallback(
     async (size: TablePageSizeOption) => {

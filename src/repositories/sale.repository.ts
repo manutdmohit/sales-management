@@ -256,6 +256,39 @@ export const saleRepository = {
     }));
   },
 
+  async aggregateProfitTotals(
+    businessId: string,
+    from: Date,
+    to: Date
+  ): Promise<{ revenue: number; cost: number; count: number }> {
+    const rows = await SaleModel.aggregate<{
+      revenue: number;
+      cost: number;
+      count: number;
+    }>([
+      {
+        $match: {
+          businessId,
+          createdAt: { $gte: from, $lte: to },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          revenue: { $sum: "$subtotal" },
+          cost: { $sum: { $ifNull: ["$totalCost", 0] } },
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+    const row = rows[0];
+    return {
+      revenue: row?.revenue ?? 0,
+      cost: row?.cost ?? 0,
+      count: row?.count ?? 0,
+    };
+  },
+
   async findForGrossProfitDetails(
     businessId: string,
     from: Date,

@@ -43,13 +43,17 @@ async function enrichBatches(
   batches: Batch[],
   asOf: Date
 ): Promise<EnrichedBatch[]> {
+  const productIds = [...new Set(batches.map((batch) => batch.productId))];
+  const products = await productRepository.findByIds(productIds);
+  const productMap = new Map(products.map((product) => [product._id, product]));
+
   const enriched: EnrichedBatch[] = [];
   for (const batch of batches) {
     if (!batch.expiryDate) continue;
     const level = expiryAlertLevel(new Date(batch.expiryDate), asOf);
     if (!level) continue;
 
-    const product = await productRepository.findById(batch.productId);
+    const product = productMap.get(batch.productId);
     if (!product || !product.trackExpiry) continue;
 
     enriched.push({

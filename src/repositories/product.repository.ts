@@ -121,6 +121,15 @@ export const productRepository = {
     return doc ? toProduct(doc as Record<string, unknown>) : null;
   },
 
+  async findByIds(ids: string[]): Promise<Product[]> {
+    const oids = ids
+      .map((id) => toObjectId(id))
+      .filter((oid): oid is NonNullable<typeof oid> => oid != null);
+    if (oids.length === 0) return [];
+    const docs = await ProductModel.find({ _id: { $in: oids } }).lean();
+    return docs.map((doc) => toProduct(doc as Record<string, unknown>));
+  },
+
   async create(
     data: Omit<Product, "_id" | "createdAt" | "updatedAt">
   ): Promise<Product> {

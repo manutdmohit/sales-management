@@ -31,7 +31,7 @@ export function TableSettingsProvider({ children }: { children: ReactNode }) {
   const [pageSize, setPageSizeState] = useState<TablePageSizeOption>(
     DEFAULT_TABLE_PAGE_SIZE
   );
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   const refresh = useCallback(async () => {
     const res = await fetch("/api/settings");
@@ -42,7 +42,18 @@ export function TableSettingsProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    refresh().finally(() => setLoading(false));
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      refresh()
+        .catch(() => undefined)
+        .finally(() => {
+          if (!cancelled) setLoading(false);
+        });
+    }, 1500);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
   }, [refresh]);
 
   const setPageSize = useCallback(

@@ -160,8 +160,9 @@ export function NotificationBell() {
       return;
     }
 
-    void refreshCount();
-    if (open) void refreshList();
+    const initialDelay = window.setTimeout(() => {
+      void refreshCount();
+    }, 2500);
 
     const tick = () => {
       void refreshCount();
@@ -190,12 +191,19 @@ export function NotificationBell() {
     document.addEventListener("visibilitychange", onVisibilityChange);
 
     return () => {
+      window.clearTimeout(initialDelay);
       window.clearInterval(intervalId);
       window.removeEventListener(NOTIFICATIONS_CHANGED_EVENT, onChanged);
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, [businessId, open, refreshCount, refreshList]);
+
+  useEffect(() => {
+    if (open && businessId) {
+      void refreshList();
+    }
+  }, [open, businessId, refreshList]);
 
   useEffect(() => {
     if (!open) return;

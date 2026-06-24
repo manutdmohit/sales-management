@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { loginSchema } from "@/schemas/auth.schema";
 import { authService } from "@/services/auth.service";
-import { ensureDbReady } from "@/lib/api";
+import { connectDb } from "@/lib/db";
 import { sessionCookieOptions } from "@/lib/auth/session";
 import { toErrorResponse } from "@/lib/errors";
 
 export async function POST(request: Request) {
   try {
-    await ensureDbReady();
+    await connectDb();
     const body = await request.json();
     const parsed = loginSchema.safeParse(body);
     if (!parsed.success) {

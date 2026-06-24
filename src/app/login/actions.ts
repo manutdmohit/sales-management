@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { authService } from "@/services/auth.service";
-import { ensureDbReady } from "@/lib/api";
+import { connectDb } from "@/lib/db";
 import { sessionCookieOptions } from "@/lib/auth/session";
 import { staffHomePath } from "@/domain/roles";
 import { loginSchema } from "@/schemas/auth.schema";
@@ -29,7 +29,7 @@ export async function loginAction(formData: FormData) {
   let role: string;
 
   try {
-    await ensureDbReady();
+    await connectDb();
     const result = await authService.login(parsed.data);
     token = result.token;
     role = result.user.role;

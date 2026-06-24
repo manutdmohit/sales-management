@@ -14,6 +14,8 @@
     "backfill:vedic-batches": "tsx scripts/backfill-vedic-batches.ts",
     "backfill:product-costs": "tsx scripts/backfill-product-costs.ts",
     "reminders": "tsx scripts/run-reminders.ts",
+    "export:db": "tsx scripts/export-db.ts",
+    "db:indexes": "tsx scripts/ensure-indexes.ts",
     "test:email": "tsx scripts/test-email.ts"
   },
   "dependencies": {

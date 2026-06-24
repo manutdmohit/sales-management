@@ -51,60 +51,60 @@ export default function DashboardPage() {
   const [summary, setSummary] = useState<StockSummary[]>([]);
   const [lowStock, setLowStock] = useState(0);
   const [expiryAlerts, setExpiryAlerts] = useState<ExpiryAlertRow[]>([]);
-  const [expiryLoading, setExpiryLoading] = useState(false);
   const [profitPeriod, setProfitPeriod] = useState<ReportPeriod>("daily");
   const [profitSnapshot, setProfitSnapshot] = useState<ProfitSnapshot | null>(
     null
   );
-  const [profitLoading, setProfitLoading] = useState(false);
-
-  useEffect(() => {
-    if (!businessId) return;
-    fetch(`/api/inventory?businessId=${businessId}`)
-      .then((r) => r.json())
-      .then((json) => {
-        const data: StockSummary[] = json.data ?? [];
-        setSummary(data);
-        setLowStock(data.filter((s) => s.isLowStock).length);
-      });
-  }, [businessId]);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (!businessId) {
+      setSummary([]);
+      setLowStock(0);
       setExpiryAlerts([]);
-      return;
-    }
-    setExpiryLoading(true);
-    fetch(`/api/inventory/expiring?businessId=${businessId}`, {
-      cache: "no-store",
-    })
-      .then((r) => r.json())
-      .then((json) => setExpiryAlerts(json.data ?? []))
-      .catch(() => setExpiryAlerts([]))
-      .finally(() => setExpiryLoading(false));
-  }, [businessId]);
-
-  useEffect(() => {
-    if (!businessId) {
       setProfitSnapshot(null);
       return;
     }
-    setProfitLoading(true);
+
+    let cancelled = false;
+    setLoading(true);
+
     fetch(
-      `/api/reports?businessId=${businessId}&kind=profit&period=${profitPeriod}`,
+      `/api/dashboard?businessId=${encodeURIComponent(businessId)}&period=${profitPeriod}`,
       { cache: "no-store" }
     )
       .then((r) => r.json())
       .then((json) => {
+        if (cancelled) return;
         const data = json.data;
-        setProfitSnapshot({
-          total: data?.totalAmount ?? 0,
-          from: data?.from,
-          to: data?.to,
-        });
+        const nextSummary: StockSummary[] = data?.summary ?? [];
+        setSummary(nextSummary);
+        setLowStock(nextSummary.filter((s) => s.isLowStock).length);
+        setExpiryAlerts(data?.expiryAlerts ?? []);
+        setProfitSnapshot(
+          data?.profit
+            ? {
+                total: data.profit.total ?? 0,
+                from: data.profit.from,
+                to: data.profit.to,
+              }
+            : null
+        );
       })
-      .catch(() => setProfitSnapshot(null))
-      .finally(() => setProfitLoading(false));
+      .catch(() => {
+        if (cancelled) return;
+        setSummary([]);
+        setLowStock(0);
+        setExpiryAlerts([]);
+        setProfitSnapshot(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [businessId, profitPeriod]);
 
   const profitPeriodMeta = REPORT_PERIOD_OPTIONS.find(
@@ -145,7 +145,7 @@ export default function DashboardPage() {
     },
     {
       label: "Expiry alerts",
-      value: expiryLoading ? "…" : expiryAlerts.length,
+      value: loading ? "…" : expiryAlerts.length,
       icon: CalendarClock,
       tint: "bg-chart-3/10 text-chart-3",
     },
@@ -177,13 +177,13 @@ export default function DashboardPage() {
             <CardTitle
               className={cn(
                 "font-mono text-3xl tabular-nums sm:text-4xl",
-                !profitLoading &&
+                !loading &&
                   profitSnapshot != null &&
                   profitSnapshot.total < 0 &&
                   "text-destructive"
               )}
             >
-              {profitLoading || profitSnapshot == null
+              {loading || profitSnapshot == null
                 ? "…"
                 : profitSnapshot.total.toFixed(2)}
             </CardTitle>
@@ -331,7 +331,7 @@ export default function DashboardPage() {
                 Expiring products
               </CardTitle>
               <CardDescription>
-                {expiryLoading
+                {loading
                   ? "Checking batches…"
                   : expiryAlerts.length === 0
                     ? "No batches expiring within 30 days"
@@ -345,7 +345,7 @@ export default function DashboardPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              {!expiryLoading && expiryAlerts.length > 0 && (
+              {!loading && expiryAlerts.length > 0 && (
                 <ul className="space-y-2 text-sm">
                   {expiryAlerts.slice(0, 5).map((row) => (
                     <li

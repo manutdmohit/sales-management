@@ -1,4 +1,5 @@
 import { loginAction } from "@/app/login/actions";
+import { LoginSubmitButton } from "@/app/login/login-submit-button";
 import { MAGIC_TOUCH_BRAND } from "@/domain/brand";
 
 type LoginPageProps = {
@@ -60,9 +61,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
               className="login-input"
             />
           </div>
-          <button type="submit" className="login-button">
-            Sign in
-          </button>
+          <LoginSubmitButton />
         </form>
 
         <p className="login-hint">

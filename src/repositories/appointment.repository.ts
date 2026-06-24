@@ -196,6 +196,37 @@ export const appointmentRepository = {
     }));
   },
 
+  async aggregateServiceTotals(
+    businessId: string,
+    from: Date,
+    to: Date
+  ): Promise<{ revenue: number; count: number }> {
+    const rows = await AppointmentModel.aggregate<{
+      revenue: number;
+      count: number;
+    }>([
+      {
+        $match: {
+          businessId,
+          createdAt: { $gte: from, $lte: to },
+          status: { $in: ["BOOKED", "COMPLETED"] },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          revenue: { $sum: "$price" },
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+    const row = rows[0];
+    return {
+      revenue: row?.revenue ?? 0,
+      count: row?.count ?? 0,
+    };
+  },
+
   /** Cash vs online collected from booking payment ledger in range. */
   async aggregatePaymentMethods(
     businessId: string,

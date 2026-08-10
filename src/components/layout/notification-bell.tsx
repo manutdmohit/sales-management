@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import { useCallback, useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import {
   AlertTriangle,
   Bell,
@@ -12,48 +12,31 @@ import {
   Trash2,
   Clock,
   HeartHandshake,
-} from "lucide-react";
-import { toast } from "sonner";
-import { useBusiness } from "@/lib/business-context";
-import { NOTIFICATIONS_CHANGED_EVENT } from "@/lib/notifications-client";
-import type { Notification, NotificationType } from "@/domain/types";
-import { Button } from "@/components/ui/button";
-import { useConfirm } from "@/components/ui/confirm-provider";
-import { cn } from "@/lib/utils";
-import { formatDateTimeYmd } from "@/lib/format-datetime";
-
-const POLL_MS_DESKTOP = 5_000;
-const POLL_MS_TOUCH = 20_000;
-const POLL_MS_HIDDEN = 60_000;
-
-function pollIntervalMs(): number {
-  if (typeof document !== "undefined" && document.visibilityState === "hidden") {
-    return POLL_MS_HIDDEN;
-  }
-  if (
-    typeof window !== "undefined" &&
-    window.matchMedia("(hover: none) and (pointer: coarse)").matches
-  ) {
-    return POLL_MS_TOUCH;
-  }
-  return POLL_MS_DESKTOP;
-}
+} from 'lucide-react';
+import { toast } from 'sonner';
+import { useBusiness } from '@/lib/business-context';
+import { NOTIFICATIONS_CHANGED_EVENT } from '@/lib/notifications-client';
+import type { Notification, NotificationType } from '@/domain/types';
+import { Button } from '@/components/ui/button';
+import { useConfirm } from '@/components/ui/confirm-provider';
+import { cn } from '@/lib/utils';
+import { formatDateTimeYmd } from '@/lib/format-datetime';
 
 function iconForType(type: NotificationType) {
   switch (type) {
-    case "LOW_STOCK":
+    case 'LOW_STOCK':
       return AlertTriangle;
-    case "CREDIT_SALE":
+    case 'CREDIT_SALE':
       return Receipt;
-    case "CREDIT_DUE_REMINDER":
+    case 'CREDIT_DUE_REMINDER':
       return Clock;
-    case "APPOINTMENT_BOOKED":
+    case 'APPOINTMENT_BOOKED':
       return CalendarClock;
-    case "FOLLOWUP_REMINDER":
+    case 'FOLLOWUP_REMINDER':
       return HeartHandshake;
-    case "EXPIRY_WARNING":
+    case 'EXPIRY_WARNING':
       return AlertTriangle;
-    case "EXPIRY_CRITICAL":
+    case 'EXPIRY_CRITICAL':
       return CalendarX;
     default:
       return Bell;
@@ -61,31 +44,31 @@ function iconForType(type: NotificationType) {
 }
 
 function hrefForNotification(n: Notification): string | null {
-  if (n.referenceType === "product") return "/inventory";
-  if (n.referenceType === "batch") return "/inventory";
-  if (n.referenceType === "sale") return "/receivables";
-  if (n.referenceType === "appointment") return "/appointments";
+  if (n.referenceType === 'product') return '/inventory';
+  if (n.referenceType === 'batch') return '/inventory';
+  if (n.referenceType === 'sale') return '/receivables';
+  if (n.referenceType === 'appointment') return '/appointments';
   return null;
 }
 
 function tintForType(type: NotificationType): string {
   switch (type) {
-    case "LOW_STOCK":
-      return "bg-destructive/10 text-destructive";
-    case "CREDIT_SALE":
-      return "bg-chart-1/10 text-chart-1";
-    case "CREDIT_DUE_REMINDER":
-      return "bg-chart-3/10 text-chart-3";
-    case "APPOINTMENT_BOOKED":
-      return "bg-chart-2/10 text-chart-2";
-    case "FOLLOWUP_REMINDER":
-      return "bg-chart-4/10 text-chart-4";
-    case "EXPIRY_WARNING":
-      return "bg-chart-3/10 text-chart-3";
-    case "EXPIRY_CRITICAL":
-      return "bg-destructive/10 text-destructive";
+    case 'LOW_STOCK':
+      return 'bg-destructive/10 text-destructive';
+    case 'CREDIT_SALE':
+      return 'bg-chart-1/10 text-chart-1';
+    case 'CREDIT_DUE_REMINDER':
+      return 'bg-chart-3/10 text-chart-3';
+    case 'APPOINTMENT_BOOKED':
+      return 'bg-chart-2/10 text-chart-2';
+    case 'FOLLOWUP_REMINDER':
+      return 'bg-chart-4/10 text-chart-4';
+    case 'EXPIRY_WARNING':
+      return 'bg-chart-3/10 text-chart-3';
+    case 'EXPIRY_CRITICAL':
+      return 'bg-destructive/10 text-destructive';
     default:
-      return "bg-muted text-muted-foreground";
+      return 'bg-muted text-muted-foreground';
   }
 }
 
@@ -111,7 +94,7 @@ export function NotificationBell() {
     try {
       const res = await fetch(
         `/api/notifications?businessId=${businessId}&countOnly=true`,
-        { cache: "no-store" }
+        { cache: 'no-store' },
       );
       if (!res.ok) return;
       const json = await res.json();
@@ -131,7 +114,7 @@ export function NotificationBell() {
       try {
         const res = await fetch(
           `/api/notifications?businessId=${businessId}&unreadOnly=false&page=1&pageSize=8`,
-          { cache: "no-store" }
+          { cache: 'no-store' },
         );
         if (!res.ok) return;
         const json = await res.json();
@@ -140,17 +123,14 @@ export function NotificationBell() {
         if (!options?.silent) setLoading(false);
       }
     },
-    [businessId]
+    [businessId],
   );
 
   const refreshAll = useCallback(
     async (options?: { silent?: boolean }) => {
-      await Promise.all([
-        refreshCount(),
-        refreshList(options),
-      ]);
+      await Promise.all([refreshCount(), refreshList(options)]);
     },
-    [refreshCount, refreshList]
+    [refreshCount, refreshList],
   );
 
   useEffect(() => {
@@ -160,44 +140,30 @@ export function NotificationBell() {
       return;
     }
 
-    const initialDelay = window.setTimeout(() => {
-      void refreshCount();
-    }, 2500);
+    // Load notifications once on mount
+    void refreshAll({ silent: true });
 
-    const tick = () => {
+    // Refresh on window focus (user returns to tab)
+    const onFocus = () => {
+      void refreshCount();
+    };
+    window.addEventListener('focus', onFocus);
+
+    // Listen for inventory change events (stock updated, expiry changed, etc)
+    const onInventoryChanged = () => {
       void refreshCount();
       if (openRef.current) void refreshList({ silent: true });
     };
-
-    let intervalId = window.setInterval(tick, pollIntervalMs());
-
-    const resetInterval = () => {
-      window.clearInterval(intervalId);
-      intervalId = window.setInterval(tick, pollIntervalMs());
-    };
-
-    const onChanged = () => tick();
-    const onFocus = () => {
-      tick();
-      resetInterval();
-    };
-    const onVisibilityChange = () => {
-      resetInterval();
-      if (document.visibilityState === "visible") tick();
-    };
-
-    window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, onChanged);
-    window.addEventListener("focus", onFocus);
-    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, onInventoryChanged);
 
     return () => {
-      window.clearTimeout(initialDelay);
-      window.clearInterval(intervalId);
-      window.removeEventListener(NOTIFICATIONS_CHANGED_EVENT, onChanged);
-      window.removeEventListener("focus", onFocus);
-      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener(
+        NOTIFICATIONS_CHANGED_EVENT,
+        onInventoryChanged,
+      );
     };
-  }, [businessId, open, refreshCount, refreshList]);
+  }, [businessId, refreshCount, refreshList, refreshAll]);
 
   useEffect(() => {
     if (open && businessId) {
@@ -208,27 +174,24 @@ export function NotificationBell() {
   useEffect(() => {
     if (!open) return;
     function onPointerDown(e: MouseEvent) {
-      if (
-        panelRef.current &&
-        !panelRef.current.contains(e.target as Node)
-      ) {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
         setOpen(false);
       }
     }
-    document.addEventListener("mousedown", onPointerDown);
-    return () => document.removeEventListener("mousedown", onPointerDown);
+    document.addEventListener('mousedown', onPointerDown);
+    return () => document.removeEventListener('mousedown', onPointerDown);
   }, [open]);
 
   async function markRead(id: string) {
-    await fetch(`/api/notifications/${id}`, { method: "PATCH" });
+    await fetch(`/api/notifications/${id}`, { method: 'PATCH' });
     await refreshAll({ silent: true });
   }
 
   async function markAllRead() {
     if (!businessId) return;
-    await fetch("/api/notifications/read-all", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+    await fetch('/api/notifications/read-all', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ businessId }),
     });
     await refreshAll({ silent: true });
@@ -236,24 +199,24 @@ export function NotificationBell() {
 
   async function removeNotification(notification: Notification) {
     const ok = await confirm({
-      title: "Are you sure you want to remove this notification?",
+      title: 'Are you sure you want to remove this notification?',
       description: `"${notification.title}" will be permanently deleted.`,
-      confirmLabel: "Yes, remove it",
-      cancelLabel: "Keep it",
-      variant: "warning",
-      cancelToast: "Notification kept",
+      confirmLabel: 'Yes, remove it',
+      cancelLabel: 'Keep it',
+      variant: 'warning',
+      cancelToast: 'Notification kept',
     });
     if (!ok) return;
 
     const res = await fetch(`/api/notifications/${notification._id}`, {
-      method: "DELETE",
+      method: 'DELETE',
     });
     const json = await res.json();
     if (!res.ok) {
-      toast.error(json.error ?? "Failed to remove notification");
+      toast.error(json.error ?? 'Failed to remove notification');
       return;
     }
-    toast.success("Notification removed");
+    toast.success('Notification removed');
     await refreshAll({ silent: true });
   }
 
@@ -264,7 +227,7 @@ export function NotificationBell() {
         variant="outline"
         size="icon-sm"
         className="relative shrink-0 touch-manipulation"
-        aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ""}`}
+        aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ''}`}
         aria-live="polite"
         onClick={() => {
           const next = !open;
@@ -275,7 +238,7 @@ export function NotificationBell() {
         <Bell className="size-4" />
         {unreadCount > 0 && (
           <span className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-white">
-            {unreadCount > 9 ? "9+" : unreadCount}
+            {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
       </Button>
@@ -316,14 +279,14 @@ export function NotificationBell() {
                 const content = (
                   <div
                     className={cn(
-                      "flex gap-3 px-4 py-3 transition-colors hover:bg-muted/60",
-                      !n.isRead && "bg-primary/5"
+                      'flex gap-3 px-4 py-3 transition-colors hover:bg-muted/60',
+                      !n.isRead && 'bg-primary/5',
                     )}
                   >
                     <div
                       className={cn(
-                        "flex size-9 shrink-0 items-center justify-center rounded-lg",
-                        tintForType(n.type)
+                        'flex size-9 shrink-0 items-center justify-center rounded-lg',
+                        tintForType(n.type),
                       )}
                     >
                       <Icon className="size-4" />
